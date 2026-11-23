@@ -1,0 +1,7 @@
+# Owner-facing prose, kept as written
+PLAN.md
+JOURNAL.md
+
+# Lockfiles are owned by their package managers
+pnpm-lock.yaml
+uv.lock
