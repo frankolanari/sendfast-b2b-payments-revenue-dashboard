@@ -74,6 +74,14 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Quotable line:** "Build it once properly, then turn the process into the product."
 **Tags:** #linkedin #book #skill
 
+## 2026-11-23 · Planning · Naming: SendFast B2B Payments Revenue Dashboard
+**Type:** decision
+**What happened:** Named the project and the fictional company. "Synthetic-first" was the first idea, but it describes how the project is built, not what the dashboard shows. A stranger reading the repo name should know the business and the purpose at a glance. Settled on "SendFast B2B Payments Revenue Dashboard". SendFast is the fictional cross-border payments API company the synthetic data describes.
+**Why it matters:** The name is the first thing a hiring manager or reader sees. It should say what the dashboard is for; the method belongs in the README's first line.
+**Options considered / pushback:** `synthetic-first-revenue-dashboard` (method-first, no business context), `b2b-payments-revenue-dashboard` (clear but generic), `payments-lead-to-revenue-dashboard`. The owner chose to add a company name to give the fictional business an identity.
+**Quotable line:** "Name the project for what it shows, not how you built it."
+**Tags:** #linkedin #case-study #skill
+
 ---
 
 ## Owner notes
