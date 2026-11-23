@@ -185,7 +185,7 @@ Cloudflare Pages (React)  ──▶  Cloudflare Worker (proxy, holds Metabase AP
 - Repo structure above, `Makefile` with targets: `up`, `down`, `generate`, `compile-maps`, `transform`, `test`, `metabase-bootstrap`, `golden`, `conformance`, `web`, `snapshot`, `demo` (everything end to end).
 - `docker-compose.yml`: `postgres-data`, `postgres-metabase`, `metabase` (pinned tag). A `prod` profile that reads credentials from the host environment only.
 - Python 3.12 managed by `uv`. Node 24 LTS with `pnpm` (changed from Node 22 on 2026-11-23: 24 is the active LTS line; see JOURNAL.md).
-- Pre-commit hooks: `ruff`, `ruff format`, `sqlfluff` (postgres dialect, dbt templater), `prettier`, `eslint`, `gitleaks`.
+- Pre-commit hooks: `ruff`, `ruff format`, `sqlfluff` (postgres dialect, jinja templater with dbt built-ins: changed from the dbt templater on 2026-11-23 because it needs a live database just to lint; see JOURNAL.md), `prettier`, `eslint`, `gitleaks`.
 - `CLAUDE.md` with the agent rules (Section 13).
 
 **Acceptance criteria**

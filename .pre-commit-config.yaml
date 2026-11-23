@@ -23,8 +23,6 @@ repos:
     hooks:
       - id: sqlfluff-lint
         files: ^dbt/models/
-        additional_dependencies:
-          [dbt-postgres==1.11.0, sqlfluff-templater-dbt==4.5.0]
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

@@ -1,11 +1,20 @@
 [sqlfluff]
 dialect = postgres
-templater = dbt
+# jinja templater with dbt built-ins (source, ref, config) lints without a database
+# connection, so the CI lint job needs no Postgres. dbt itself validates refs (`make dbt-parse`).
+templater = jinja
 max_line_length = 120
+# ST06 wants simple columns before calculations. Staging models emit columns in contract order,
+# which downstream models and conformance checks rely on, so the rule is excluded.
+exclude_rules = ST06
 
-[sqlfluff:templater:dbt]
-project_dir = dbt
-profiles_dir = dbt
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
 
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = lower
+
+[sqlfluff:rules:references.keywords]
+# Contract and source column names that are (non-reserved) SQL keywords. They are deliberate:
+# the contract or the CRM names them. `source` is also dbt's conventional first CTE.
+ignore_words = name,domain,source,stage,value,timestamp,date,type

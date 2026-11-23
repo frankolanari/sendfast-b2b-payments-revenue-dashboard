@@ -8,6 +8,7 @@ COMPOSE := docker compose
 WAIT_TIMEOUT ?= 300
 
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
+        compiled-check compile-idempotent dbt-parse gate-2 \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -44,11 +45,27 @@ contract-check: ## Validate contract, dictionary freshness, changelog, version b
 contract-dictionary: ## Regenerate contract/data_dictionary.md from the contract
 	uv run python scripts/contract_check.py render
 
+# ── CRM mapping layer (Stage 2) ──────────────────────────────────────────
+CRM ?= hubspot
+DBT := uv run dbt --no-use-colors
+DBT_DIRS := --project-dir dbt --profiles-dir dbt
+
+compiled-check: ## Fail if committed staging models differ from a fresh compile of CRM's map
+	uv run python scripts/compile_mappings.py check --crm $(CRM)
+
+compile-idempotent: ## Compile twice; the second run must change nothing
+	uv run python scripts/compile_mappings.py compile --crm $(CRM)
+	uv run python scripts/compile_mappings.py compile --crm $(CRM)
+	uv run python scripts/compile_mappings.py check --crm $(CRM)
+
+dbt-parse: ## dbt parses the project (Jinja, sources, refs, tests) without a database
+	$(DBT) parse $(DBT_DIRS)
+
 # ── Pipeline (built in later stages) ─────────────────────────────────────
 generate: ## Synthetic data generator (Stage 3)
 	@echo "Not built yet: Stage 3." && exit 1
-compile-maps: ## CRM YAML maps -> dbt staging SQL (Stage 2)
-	@echo "Not built yet: Stage 2." && exit 1
+compile-maps: ## CRM YAML map -> dbt staging models (CRM=hubspot by default)
+	uv run python scripts/compile_mappings.py compile --crm $(CRM)
 transform: ## dbt build (Stage 4)
 	@echo "Not built yet: Stage 4." && exit 1
 metabase-bootstrap: ## Rebuild Metabase content from the repo (Stage 6)
@@ -70,4 +87,7 @@ gate-0: up lint secrets ## G0: containers healthy, pre-commit passes, gitleaks c
 gate-1: gate-0 contract-check test ## G1: contract valid, versioned, dictionary current (+ G0)
 	@echo "Gate 1 passed."
 
-gates: gate-1 ## Run every gate built so far
+gate-2: gate-1 compiled-check compile-idempotent dbt-parse ## G2: maps compile, up to date, idempotent (+ G0-1)
+	@echo "Gate 2 passed."
+
+gates: gate-2 ## Run every gate built so far

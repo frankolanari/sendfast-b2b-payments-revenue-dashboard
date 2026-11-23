@@ -25,3 +25,4 @@ dbt/logs/
 .DS_Store
 .idea/
 .vscode/
+dbt/.user.yml
