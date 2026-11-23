@@ -1,0 +1,23 @@
+# dbt project for SendFast (PLAN.md Stage 4). Staging -> intermediate -> marts (analytics).
+name: sendfast
+version: "1.0.0"
+config-version: 2
+profile: sendfast
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: [target, dbt_packages]
+
+models:
+  sendfast:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: analytics
+      +materialized: table

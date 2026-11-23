@@ -1,0 +1,14 @@
+# Reads env vars only (cloud-ready rule 1). Defaults are the local synthetic stack; no secrets here.
+sendfast:
+  target: default
+  outputs:
+    default:
+      type: postgres
+      host: "{{ env_var('DATA_DB_HOST', 'localhost') }}"
+      port: "{{ env_var('DATA_DB_HOST_PORT', '55432') | as_number }}"
+      dbname: "{{ env_var('DATA_DB_NAME', 'sendfast') }}"
+      user: "{{ env_var('DBT_USER', 'transformer') }}"
+      password: "{{ env_var('DBT_PASSWORD', '') }}"
+      schema: analytics
+      sslmode: "{{ env_var('DATA_DB_SSLMODE', 'disable') }}"
+      threads: 4

@@ -69,3 +69,19 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: make test
+
+  compiled-up-to-date:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: committed staging models equal a fresh compile of the map
+        run: make compiled-check CRM=hubspot
+      - name: compiling is idempotent
+        run: make compile-idempotent CRM=hubspot && git diff --exit-code
+      - name: dbt parses the project (sources, refs, generated tests)
+        run: make dbt-parse

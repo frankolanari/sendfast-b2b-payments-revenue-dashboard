@@ -8,3 +8,6 @@ uv.lock
 
 # Generated files: byte-for-byte what their generator writes
 contract/data_dictionary.md
+
+# Compiler-owned output (scripts/compile_mappings.py)
+dbt/models/staging/crm/

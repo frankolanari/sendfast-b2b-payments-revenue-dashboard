@@ -138,6 +138,28 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: contract format, JSON Schema, checker, version-bump rule, dictionary generator. Specific: the 15 tables, enums (rails, corridors, failure reasons), the payments conventions.
 **Tags:** #article #skill
 
+## 2026-11-23 · Stage 1 · Gate 1 passed, and a tag in the wrong place
+**Type:** gate-pass
+**What happened:** CI went green on all four jobs (lint, secrets, contract-check, unit) and PR #2 was merged and tagged `gate-1`. On the way, the agent's own command chain misfired: a branch-protection API call failed (`-f strict=true` sends the string "true", not a boolean), the merge was skipped as it should have been, but a `;` later in the same command let the tagging steps run anyway. `gate-1` was created and pushed on the Stage 0 commit. Caught immediately from the output, deleted locally and on GitHub, and redone with every step chained by `&&` plus an explicit check that the tagged commit contains the contract.
+**Why it matters:** A tag is a claim ("this commit passed Gate 1"). A wrong tag is a false claim, the exact thing the gates exist to prevent.
+**Problem → fix:** wrong tag target → delete and recreate after verifying the commit's contents. Lesson: in a chain of irreversible steps, never mix `;` with `&&`; and verify what you're about to label before labelling it.
+**Quotable line:** "The gates were fine. My shell punctuation wasn't."
+**Evidence:** PR #2, tag `gate-1` on `41231ce`.
+**Tags:** #x #skill
+
+## 2026-11-23 · Stage 2 · The hub: one readable map file per CRM
+**Type:** milestone
+**What happened:** Wrote `mappings/crm/hubspot.yml` and `scripts/compile_mappings.py`. The compiler checks the map against the contract (every canonical column present, every canonical value one the contract allows, `supported: false` only on optional tables, valid timezones and transforms), then writes the six staging models, a dbt sources file, dbt tests derived from the contract (not-null, unique, accepted values, relationships) and `int_crm__unmapped_values`. A real `dbt build` on a hand-made fixture with dirty rows built all 7 models; 43 of 44 tests passed, and the 1 failure was the fixture's deliberately unmapped lead source (`EMAIL_MARKETING`), which also showed up in the unmapped-values model with its row count, next to an unmapped country (`Atlantis`).
+**Why it matters:** This is the swap mechanism. When a new CRM's values don't match, the system says exactly which value, in which column, how many rows, before anything reaches a dashboard.
+**Options considered / pushback:** sqlfluff's dbt templater (in the plan) needs a live database connection just to lint, which would make the CI lint job depend on Postgres and credentials. Switched to the jinja templater with dbt built-ins: same SQL rules, no database; `dbt parse` separately proves sources, refs and tests resolve. Two sqlfluff rules were configured, not silenced wholesale: keyword names the contract deliberately uses (`name`, `domain`, `stage`, ...) are allowed, and ST06 (column ordering) is off because staging columns must follow contract order.
+**Problem → fix:** sqlfluff flagged quoted `"timestamp"`/`"value"` as unnecessary. Rather than guess, tested against Postgres 17: non-reserved keywords work unquoted, reserved words (`order`) don't. The compiler now quotes only Postgres reserved words.
+**Gap noted for Stage 4:** contract regex patterns (country codes, currencies, corridors) have no dbt test yet, so `Atlantis` passes through staging. Stage 4 adds a generic pattern test.
+**Numbers:** 1 map (6 entities, 5 value maps), 9 generated files, 30 compiler tests (22 rejections), 54 tests total, Gate 2 run 19 s.
+**Quotable line:** "Unmapped values aren't errors to hide. They're the to-do list for the next CRM."
+**Evidence:** `mappings/crm/hubspot.yml` (Gate 2 sign-off: is it understandable?), `mappings/README.md`.
+**Generic vs specific (#skill):** generic: map format, compiler, unmapped-values model, contract-derived tests, README. Specific: HubSpot's raw shape and value lists.
+**Tags:** #article #case-study #video #skill
+
 ---
 
 ## Owner notes

@@ -1,0 +1,114 @@
+# HubSpot → canonical CRM map. How to read and write one: mappings/README.md
+# Compile: make compile-maps CRM=hubspot
+
+crm: hubspot
+contract_version: 1.0.0
+source_schema: crm_hubspot # where the CRM sync lands HubSpot's raw tables
+timezone: UTC # zone of any raw timestamp that has no zone of its own
+
+users:
+  source: owners
+  columns:
+    user_id: owner_id
+    name: { expr: "concat_ws(' ', first_name, last_name)" }
+    team: team_name
+    active: { expr: "not archived" }
+  values:
+    team:
+      SMB Sales: smb
+      Mid-Market Sales: mid_market
+      Enterprise Sales: enterprise
+      Partnerships: partnerships
+
+accounts:
+  source: companies
+  columns:
+    account_id: hs_object_id
+    name: name
+    domain: { column: domain, transform: domain }
+    industry: industry
+    country: country
+    segment: customer_segment
+    owner_id: hubspot_owner_id
+    created_at: createdate
+    billing_customer_ref: stripe_customer_id
+  values:
+    segment:
+      SMB: smb
+      Mid-Market: mid_market
+      Enterprise: enterprise
+    country: # HubSpot stores the country as free text
+      Nigeria: NG
+      Kenya: KE
+      Ghana: GH
+      South Africa: ZA
+      United Kingdom: GB
+      United States: US
+      Germany: DE
+      France: FR
+      Netherlands: NL
+      India: IN
+      United Arab Emirates: AE
+      Canada: CA
+
+contacts:
+  source: contacts
+  columns:
+    contact_id: hs_object_id
+    account_id: associatedcompanyid
+    email: email
+    title: jobtitle
+    created_at: createdate
+
+leads:
+  source: leads
+  columns:
+    lead_id: hs_object_id
+    contact_id: associated_contact_id
+    account_id: associated_company_id
+    lead_source: hs_analytics_source
+    created_at: createdate
+    converted_at: hs_lead_converted_at
+  values:
+    lead_source: &lead_sources
+      PAID_SEARCH: paid
+      PAID_SOCIAL: paid
+      ORGANIC_SEARCH: inbound
+      DIRECT_TRAFFIC: inbound
+      REFERRALS: partner
+      OFFLINE: outbound
+
+opportunities:
+  source: deals
+  columns:
+    opportunity_id: hs_object_id
+    account_id: associated_company_id
+    owner_id: hubspot_owner_id
+    amount_usd: amount
+    created_at: createdate
+    close_date: closedate
+    stage: dealstage
+    lead_source: lead_source
+  values:
+    stage: &deal_stages
+      appointmentscheduled: discovery
+      qualifiedtobuy: qualified
+      presentationscheduled: proposal
+      contractsent: negotiation
+      closedwon: won
+      closedlost: lost
+    lead_source: *lead_sources
+  derived:
+    is_closed: "stage in ('won', 'lost')"
+    is_won: "stage = 'won'"
+
+opportunity_stage_history:
+  source: deal_property_history
+  supported: true
+  filter: "property_name = 'dealstage'"
+  columns:
+    opportunity_id: object_id
+    stage: value
+    entered_at: timestamp
+  values:
+    stage: *deal_stages
