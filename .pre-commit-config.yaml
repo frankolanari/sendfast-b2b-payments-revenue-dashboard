@@ -1,0 +1,45 @@
+# Run on every commit (`uv run pre-commit install`) and in CI (`make lint`).
+# JS hooks run the repo's own pinned prettier/eslint via pnpm, so editor, hook and CI agree.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.5.0
+    hooks:
+      - id: sqlfluff-lint
+        files: ^dbt/models/
+        additional_dependencies:
+          [dbt-postgres==1.11.0, sqlfluff-templater-dbt==4.5.0]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --write --ignore-unknown
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, css, markdown, yaml]
+      - id: eslint
+        name: eslint
+        entry: pnpm exec eslint --max-warnings=0
+        language: system
+        types_or: [javascript, jsx, ts, tsx]

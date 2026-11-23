@@ -1,0 +1,27 @@
+# Environment: only the *.example files are committed
+.env
+.env.*
+!.env.example
+!.env.cloud.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

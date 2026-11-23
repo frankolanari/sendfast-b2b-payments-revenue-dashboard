@@ -82,6 +82,37 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Quotable line:** "Name the project for what it shows, not how you built it."
 **Tags:** #linkedin #case-study #skill
 
+## 2026-11-23 · Stage 0 · Owner decisions before the first line of code
+**Type:** decision
+**What happened:** Before scaffolding, the agent checked the machine and the GitHub repo against the plan and raised three mismatches. The owner decided all three: pin Node 24 LTS instead of 22 (24 is the active LTS line and is what's installed), make the repo public now so branch protection can enforce the gates on a free GitHub account, and do Stage 0 only in this session.
+**Why it matters:** The gate system depends on branch protection. On a free account, a private repo can't enforce it, so "merge only on green CI" would have been a promise, not a rule.
+**Options considered / pushback:** Keep the repo private and enforce by convention until Stage 9 (rejected: the gates are the point). Install Node 22 to match the plan (rejected: older LTS line, no benefit).
+**Quotable line:** "A rule your tools can't enforce is just a suggestion."
+**Tags:** #linkedin #skill
+
+## 2026-11-23 · Stage 0 · Version pins checked against vendors, not memory
+**Type:** decision
+**What happened:** Resolved the Stage 0 [verify] items from live sources. Supabase Cloud runs Postgres 17 (17.11 builds), so the local data and app DBs pin `postgres:17.11-alpine`. Metabase is pinned to `v0.64.8.3`, the newest patch on the `v0.64-lts` line, not the newest release (`v0.65.6.3`): the 0.65 line shipped three patches in three days, which is the wrong thing to pin an API bootstrap against. Web search results disagreed on the latest Metabase version, so the Docker Hub tag list was used as the source of truth.
+**Why it matters:** The bootstrap (Stage 6) talks to Metabase's REST API, which changes between versions. Pinning the LTS line means fewer surprise breaks.
+**Plan deviations:** (1) The `prod` compose profile is not defined yet; it has nothing to run until the conformance CLI exists, so it moves to Stage 8. (2) Env templates are `.env.example` (local, matches the README's `cp .env.example .env`) and `.env.cloud.example`, instead of `.env.local.example`. (3) `deploy/sql/roles.sql` waits until there are schemas to grant on (Stage 3/4).
+**Quotable line:** "Pin the boring version. Your bootstrap script will thank you."
+**Tags:** #skill
+
+## 2026-11-23 · Stage 0 · Gate 0 passed locally after three loops (one was a false pass)
+**Type:** problem-fix
+**What happened:** Gate 0 took four runs. Run 1 failed: port 5432 was already taken by another project's Postgres on the same machine. Run 2 printed "Gate 0 passed", but that was hollow: `pre-commit run --all-files` only checks files git tracks, and nothing new was staged yet, so prettier, eslint and check-yaml all skipped, and gitleaks only scanned the two old commits. Run 3, with everything staged, failed for real: prettier had reformatted `pnpm-lock.yaml`. Run 4 passed with every hook actually checking files.
+**Why it matters:** A green check that checked nothing is worse than a red one, because it looks like proof. The only reason it was caught is that the output was read, not just the exit code.
+**Problem → fix:**
+- Port clash → the data DB's host port defaults to 55432 (env-driven, so anyone can change it). The other project's container was not touched.
+- False pass → stage files before running the gate. A first run on a fresh scaffold has to be checked for "Skipped".
+- Prettier on lockfiles → `.prettierignore` covers `pnpm-lock.yaml`, `uv.lock`, `PLAN.md` and `JOURNAL.md`.
+- Also: the first run's exit code was 0 even though `make` failed, because the output was piped through `tail`. Reruns use `set -o pipefail`.
+- Also: pnpm 11 silently wrote a `pnpm-workspace.yaml` exempting `typescript-eslint@8.74.0` (published that day) from its minimum-release-age rule. Rather than keep a supply-chain exemption, pinned 8.73.0 and deleted the file.
+**Numbers:** first `make up` 17 min (image pulls on a slow connection); warm Gate 0 rerun 6 s; Metabase healthy about 2 to 3 min after container start on first boot.
+**Quotable line:** "My first green check had checked nothing. Read the output, not the exit code."
+**Evidence:** branch `stage-0-scaffold`.
+**Tags:** #linkedin #x #skill
+
 ---
 
 ## Owner notes
