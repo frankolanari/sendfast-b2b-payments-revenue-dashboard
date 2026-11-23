@@ -5,3 +5,6 @@ JOURNAL.md
 # Lockfiles are owned by their package managers
 pnpm-lock.yaml
 uv.lock
+
+# Generated files: byte-for-byte what their generator writes
+contract/data_dictionary.md

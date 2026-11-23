@@ -7,7 +7,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 WAIT_TIMEOUT ?= 300
 
-.PHONY: help env up down lint secrets test \
+.PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -32,8 +32,17 @@ secrets: ## Scan the full git history for secrets
 	uv run pre-commit run gitleaks --all-files
 	docker run --rm -v "$(CURDIR):/repo" zricethezav/gitleaks:v8.30.1 git /repo --no-banner
 
-test: ## Unit tests (added per stage)
-	@echo "No tests yet: added from Stage 2." && exit 1
+test: ## Unit tests (pytest)
+	uv run pytest -q
+
+# ── Schema contract (Stage 1) ────────────────────────────────────────────
+BASE_REF ?= origin/main
+
+contract-check: ## Validate contract, dictionary freshness, changelog, version bump vs BASE_REF
+	uv run python scripts/contract_check.py check --base-ref $(BASE_REF)
+
+contract-dictionary: ## Regenerate contract/data_dictionary.md from the contract
+	uv run python scripts/contract_check.py render
 
 # ── Pipeline (built in later stages) ─────────────────────────────────────
 generate: ## Synthetic data generator (Stage 3)
@@ -58,4 +67,7 @@ demo: up generate compile-maps transform metabase-bootstrap golden snapshot ## E
 gate-0: up lint secrets ## G0: containers healthy, pre-commit passes, gitleaks clean
 	@echo "Gate 0 passed."
 
-gates: gate-0 ## Run every gate built so far
+gate-1: gate-0 contract-check test ## G1: contract valid, versioned, dictionary current (+ G0)
+	@echo "Gate 1 passed."
+
+gates: gate-1 ## Run every gate built so far

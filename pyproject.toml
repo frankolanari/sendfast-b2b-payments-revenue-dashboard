@@ -3,10 +3,15 @@ name = "sendfast-b2b-payments-revenue-dashboard"
 version = "0.0.0"
 description = "Synthetic-first revenue dashboard for SendFast, a fictional B2B cross-border payments API."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = ["jsonschema==4.26.0", "pyyaml==6.0.4"]
 
 [dependency-groups]
-dev = ["pre-commit==4.7.0"]
+dev = ["pre-commit==4.7.0", "pytest==9.2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts/tests"]
+pythonpath = ["scripts"]
+addopts = "--strict-markers"
 
 [tool.uv]
 package = false

@@ -113,6 +113,31 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Evidence:** branch `stage-0-scaffold`.
 **Tags:** #linkedin #x #skill
 
+## 2026-11-23 · Stage 0 · Gate 0 passed in CI and merged
+**Type:** gate-pass
+**What happened:** CI failed once before going green: `astral-sh/setup-uv@v10` doesn't exist, because that action publishes only exact tags (`v10.4.0`), not a moving major tag. Fixed after checking every other action reference exists. Then `lint` and `secrets` went green, branch protection was switched on for `main` (PR required, both checks required, applies to admins), PR #1 was merged and tagged `gate-0`.
+**Numbers:** CI lint 1m39s cold, secrets 7s.
+**Evidence:** PR #1, tag `gate-0`.
+**Tags:** #skill
+
+## 2026-11-23 · Stage 1 · Owner decision: a green gate is an approved gate
+**Type:** decision
+**What happened:** After Gate 0, the owner set the working rule: "If it works, all the tests passes. Let's move on." From now on, when a gate's automated checks pass locally and in CI, the agent merges, tags and starts the next stage without waiting. For gates that also have a human sign-off, the agent saves the evidence and links it so the owner can object afterwards. The agent still stops on a blocked gate, on anything that would weaken a check, and on decisions the plan reserves for the owner (such as the chart library at Stage 7).
+**Why it matters:** The gates are now trusted enough to replace a human approval click. That is the point of making them strict.
+**Quotable line:** "Once the checks are strict enough, 'green' is the approval."
+**Tags:** #linkedin #book #skill
+
+## 2026-11-23 · Stage 1 · The schema contract, and a resolved contradiction in the plan
+**Type:** milestone
+**What happened:** Wrote `contract/schema_contract.yml`: 15 canonical staging tables (CRM 6, billing 4, ledger 3, rates 2), each with grain, primary key, typed columns, nullability, allowed values or regex patterns, and foreign keys. `scripts/contract_check.py` validates it against a JSON Schema plus cross-reference rules a schema can't express (keys exist, primary keys not nullable, foreign keys point at the target's primary key with matching types), generates `data_dictionary.md`, and fails if the contract's meaning changes without a version bump and a changelog entry. Comment-only edits don't need a bump: the comparison is on the parsed YAML.
+**Options considered / pushback:** The plan contradicted itself. Stage 1 lists `amount_minor` on ledger tables, but Stage 4 says staging converts all amounts to major units. Went with Stage 4: the canonical shape is `amount` + `currency`, and minor units live only in the raw schemas. Also added `dispute_type` (dispute vs return), which the dispute/return rate metric needs but the plan's column list missed.
+**Problem → fix:** The JSON Schema caught a bug in the contract on the first run: in YAML inline maps, an unquoted description with a comma ("Account the contact belongs to, if associated.") silently becomes an extra key. `additionalProperties: false` flagged it. Fix: quote those two descriptions. Caught by `make contract-check` before any test of the checker itself was trusted.
+**Numbers:** 15 tables, 24 checker tests (18 of them negative: each proves a broken contract is rejected), Gate 1 warm run 7 s.
+**Quotable line:** "My contract validator's first catch was a bug in my contract."
+**Evidence:** `contract/data_dictionary.md` (Gate 1 sign-off material: the canonical tables, readable).
+**Generic vs specific (#skill):** generic: contract format, JSON Schema, checker, version-bump rule, dictionary generator. Specific: the 15 tables, enums (rails, corridors, failure reasons), the payments conventions.
+**Tags:** #article #skill
+
 ---
 
 ## Owner notes
