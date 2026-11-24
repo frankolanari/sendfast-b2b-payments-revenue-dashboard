@@ -14,7 +14,7 @@ renamed as (
         cast(associated_company_id as text) as account_id,
         cast(hubspot_owner_id as text) as owner_id,
         cast(amount as numeric) as amount_usd,
-        (cast(createdate as timestamp) at time zone 'UTC') as created_at,
+        (cast(createdate as timestamp) at time zone 'America/New_York') as created_at,
         cast(closedate as date) as close_date,
         case cast(dealstage as text)
             when 'appointmentscheduled' then 'discovery'

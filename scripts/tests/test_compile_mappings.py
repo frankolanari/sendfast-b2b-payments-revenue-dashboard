@@ -67,8 +67,12 @@ def test_value_map_and_derived_columns_are_compiled(hubspot, contract):
 
 
 def test_timestamps_are_converted_from_map_timezone(hubspot, contract):
+    tz = hubspot["timezone"]
     sql = cm.compile_map(hubspot, contract)["stg_crm__opportunities.sql"]
-    assert "(cast(createdate as timestamp) at time zone 'UTC') as created_at" in sql
+    assert f"(cast(createdate as timestamp) at time zone '{tz}') as created_at" in sql
+    hubspot["timezone"] = "Africa/Lagos"  # and it follows the map when the map changes
+    sql = cm.compile_map(hubspot, contract)["stg_crm__opportunities.sql"]
+    assert "(cast(createdate as timestamp) at time zone 'Africa/Lagos') as created_at" in sql
 
 
 def test_filter_is_applied(hubspot, contract):

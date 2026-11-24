@@ -7,15 +7,21 @@ dependencies = [
   "dbt-core==1.12.7",
   "dbt-postgres==1.11.0",
   "jsonschema==4.26.0",
+  "numpy==2.5.4",
+  "pandas==3.1.1",
   "pyyaml==6.0.4",
 ]
 
 [dependency-groups]
-dev = ["pre-commit==4.7.0", "pytest==9.2.0"]
+dev = [
+    "matplotlib==3.11.2",
+    "pre-commit==4.7.0",
+    "pytest==9.2.0",
+]
 
 [tool.pytest.ini_options]
-testpaths = ["scripts/tests"]
-pythonpath = ["scripts"]
+testpaths = ["scripts/tests", "generator/tests"]
+pythonpath = ["scripts", "generator/src"]
 addopts = "--strict-markers"
 
 [tool.uv]

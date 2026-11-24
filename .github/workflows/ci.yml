@@ -70,6 +70,20 @@ jobs:
       - run: uv sync --locked
       - run: make test
 
+  generator:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - name: committed answer keys equal a fresh computation (scale 1.0 and 0.1)
+        run: make answer-keys-check
+      - name: every planted story is detectable in the raw tables (full scale)
+        run: make stories
+
   compiled-up-to-date:
     needs: unit
     runs-on: ubuntu-latest

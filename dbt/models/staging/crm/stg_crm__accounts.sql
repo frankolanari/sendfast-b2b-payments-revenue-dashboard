@@ -36,7 +36,7 @@ renamed as (
             else cast(customer_segment as text)
         end as segment,
         cast(hubspot_owner_id as text) as owner_id,
-        (cast(createdate as timestamp) at time zone 'UTC') as created_at,
+        (cast(createdate as timestamp) at time zone 'America/New_York') as created_at,
         cast(stripe_customer_id as text) as billing_customer_ref
     from source
 
