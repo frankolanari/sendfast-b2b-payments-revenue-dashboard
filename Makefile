@@ -14,7 +14,7 @@ WAIT_TIMEOUT ?= 300
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
-        db-roles dbt-docs gate-4 \
+        db-roles dbt-docs gate-4 gate-5 \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -109,8 +109,8 @@ transform: env compile-maps db-roles ## dbt build: staging -> intermediate -> ma
 	$(DBT) build $(DBT_DIRS)
 metabase-bootstrap: ## Rebuild Metabase content from the repo (Stage 6)
 	@echo "Not built yet: Stage 6." && exit 1
-golden: ## Golden-number check (Stage 5)
-	@echo "Not built yet: Stage 5." && exit 1
+golden: env ## Golden numbers: answer key vs marts, as bi_reader (SCALE must match the loaded data)
+	uv run python scripts/golden_check.py --scale $(SCALE)
 conformance: ## Aggregate-only conformance checks (Stage 8)
 	@echo "Not built yet: Stage 8." && exit 1
 web: ## React front end dev server (Stage 7)
@@ -135,4 +135,7 @@ gate-3: gate-2 answer-keys-check stories generate-timed ## G3: invariants, deter
 gate-4: gate-3 transform ## G4: dbt build with zero test failures, identity match >= 95% (+ G0-3)
 	@echo "Gate 4 passed."
 
-gates: gate-4 ## Run every gate built so far
+gate-5: gate-4 golden ## G5: every metric in metrics.yml matches the answer key (+ G0-4)
+	@echo "Gate 5 passed."
+
+gates: gate-5 ## Run every gate built so far

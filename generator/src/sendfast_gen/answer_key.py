@@ -198,7 +198,13 @@ def compute(w: World) -> dict[str, Any]:
     )
 
     first_ok = ok.groupby("account_id")["txn_date"].min()
-    won2025 = cust[[d.year == 2025 for d in cust["won_date"]]]
+    # A customer with no CRM match has no won date the warehouse can see (owner, 2026-11-24).
+    won2025 = cust[
+        [
+            d.year == 2025 and not u
+            for d, u in zip(cust["won_date"], cust["unmatchable"], strict=True)
+        ]
+    ]
     act = [
         (first_ok[a] - d).days
         for a, d in zip(won2025["account_id"], won2025["won_date"], strict=True)
@@ -208,7 +214,8 @@ def compute(w: World) -> dict[str, Any]:
         float(np.median(act)),
         "Median days from won date (close_date of the account's first won opportunity) to its "
         "first "
-        "succeeded transaction, for accounts won in calendar 2025 that have transacted.",
+        "succeeded transaction, for accounts won in calendar 2025 that have transacted. Customers "
+        "with no CRM match are excluded: the warehouse can't know their won date.",
         accounts=len(act),
     )
 
@@ -274,15 +281,17 @@ def compute(w: World) -> dict[str, Any]:
             float(rev_idx.get((int(c["account_id"]), add_months(first_m, k)), 0.0))
             for k in range(12)
         )
-        per_source.setdefault(opt(c["observed_source"]) or "unknown", []).append(total)
+        # No CRM match: the warehouse can't see the lead source, so: unknown (owner, 2026-11-24).
+        source = None if c["unmatchable"] else opt(c["observed_source"])
+        per_source.setdefault(source or "unknown", []).append(total)
     m["net_revenue_12m_per_account_by_lead_source"] = {
         "value": {s: _r(float(np.median(v))) for s, v in sorted(per_source.items())},
         "accounts": {s: len(v) for s, v in sorted(per_source.items())},
         "definition": "For accounts that went live inside the data window and on or before "
         "2025-10-31: net revenue in their first 12 "
         "calendar months from the go-live month; the median per account, by the lead source of the "
-        "account's first won opportunity (missing -> unknown). Median, not mean, so one very large "
-        "account cannot decide the comparison.",
+        "account's first won opportunity (missing, or no CRM match -> unknown). Median, not "
+        "mean, so one very large account cannot decide the comparison.",
     }
 
     return {

@@ -229,6 +229,32 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: contract-derived dbt tests, identity map pattern (explicit id then unique domain), exclusions as one macro, a role script using psql \gexec, an at-risk rule shared by answer key and mart. Specific: payments revenue components, corridors, Stripe/ledger shapes.
 **Tags:** #linkedin #article #case-study #skill
 
+## 2026-11-24 · Stage 4 · Gate 4 passed in CI, merged, and two exceptions approved
+**Type:** gate-pass
+**What happened:** All 7 CI checks green on PR #6 (lint, secrets, contract-check, unit, compiled-up-to-date, generator, integration). Merged to `main` and tagged `gate-4` on `e6b3787`; `integration` is now a required check. The owner approved both items left pending: contract 2.0.0 (pricing keyed by the billing customer) and the three version-relative test changes. Both are logged as approved exceptions in `docs/gates/log.md`.
+**Why it matters:** The decision the owner declined to make mid-stage (which key pricing hangs off) got an explicit yes at the gate. Going ahead with a flagged recommendation worked, but only because the flag forced a review before the next stage built on it.
+**Evidence:** PR #6, tag `gate-4` on `e6b3787`, `docs/gates/log.md`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 5 · The metric dictionary and a golden check that reads what BI reads
+**Type:** milestone
+**What happened:** `metrics/metrics.yml` holds the 19 golden metrics in the PLAN format (label, definition, grain, unit, mart, column, owner, edge cases, golden block). Each definition is copied word for word from the answer key, and `scripts/golden_check.py` fails if they ever differ, if a metric is missing or extra, or if the spec's dates drift from the key's meta. Each metric's golden query runs as `bi_reader` (the marts only, what Metabase will see), in a read-only UTC session. Its `value` and every other column it returns (counts, revenue components) are compared with the key field of the same name. A mismatch prints metric, expected, actual, tolerance and the exact SQL run. Wired into `make golden`, `make gate-5` and the CI integration job (scale 0.1 key). 23 unit tests check the comparison: tolerance edges, nulls, wrong row counts, unknown columns, map-valued metrics, drift.
+**Why it matters:** Rules live in the marts (exclusions, revenue components, at-risk flag, cycle and activation days, churn type). A golden query only filters and aggregates mart columns. So the check proves the marts, not a second copy of the logic hidden in the checker.
+**Options considered / pushback:** A one-row-per-metric "KPI mart" that the check just reads (rejected: the check would prove a table built to pass it, and the printed SQL would explain nothing). Tolerances were fixed before the first run: 1e-6 for ratios (the key's rounding), one cent for money, exact for days and counts. They weren't touched after the results came in.
+**Numbers:** first run at full scale: 17/19. The two failures were the gaps predicted at Stage 4.
+**Generic vs specific (#skill):** generic: spec copies the key's definitions and the checker enforces it; parameters from a `periods` block checked against the key's meta; side columns compared by name; checker connects as the BI role. Specific: the 19 payments metrics and their queries.
+**Tags:** #article #case-study #skill
+
+## 2026-11-24 · Stage 5 · Two metrics the warehouse can't know, and a CI scale that hid them
+**Type:** problem-fix
+**What happened:** Activation days (22.5 vs 22.0, 118 vs 121 accounts) and 12-month revenue by lead source (inbound, partner and unknown off) failed at full scale. Root cause, checked by re-running the generator's truth under each candidate definition: the key used hidden truth for the 7 customers (2%) with no CRM match. The warehouse can't know their won date or lead source. With them excluded from activation and counted as `unknown` for lead source, the generator's truth equals the marts exactly, every bucket to the cent. The owner chose that definition, and the key was changed with approval (logged in `docs/gates/log.md`). The marts and the SQL were not changed.
+**Surprise:** at scale 0.1 (the CI scale) all 19 passed before the fix. The single unmatched customer there happens to fall in neither cohort. CI alone would have shown green.
+**Why it matters:** An answer key computed from ground truth can quietly expect knowledge no warehouse has. The fix belongs in the definition ("what can the business actually know?"), not in a tolerance wide enough to hide 3 accounts.
+**Options considered / pushback:** Drop unmatched customers from both metrics (also passes, but loses 2 customers' revenue from the lead-source view). Improve identity matching to recover them (the 98% match rate is a deliberate part of the data). Widen the tolerance (never: rule 1a).
+**Quotable line:** "The answer key knew things the warehouse never could. The fix was in the definition, not the SQL."
+**Generic vs specific (#skill):** generic: when a golden metric is off by a few entities, re-run the truth under each candidate definition before touching SQL; a small CI scale can miss a cohort-level bug, so the full-scale local gate is the real one. Specific: unmatched billing customers and CRM-only fields.
+**Tags:** #linkedin #x #article #book #skill
+
 ---
 
 ## Owner notes
@@ -267,4 +293,5 @@ _(Your own words, any time. Rough is fine.)_
 | 1 Contract | 2026-11-23 | 2026-11-23 | 3 | validator caught a YAML bug in the contract |
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
-| 4 Transformations | 2026-11-24 | pending CI | 4 | reserved word, sqlfluff macros, version-pinned tests |
+| 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
+| 5 Golden numbers | 2026-11-24 | pending CI | 1 | 17/19 then 19/19 after the owner-approved key change |
