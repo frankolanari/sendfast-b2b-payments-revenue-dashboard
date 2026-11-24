@@ -44,9 +44,9 @@
   },
   "metrics": {
     "activation_days": {
-      "accounts": 121,
-      "definition": "Median days from won date (close_date of the account's first won opportunity) to its first succeeded transaction, for accounts won in calendar 2025 that have transacted.",
-      "value": 22.0
+      "accounts": 118,
+      "definition": "Median days from won date (close_date of the account's first won opportunity) to its first succeeded transaction, for accounts won in calendar 2025 that have transacted. Customers with no CRM match are excluded: the warehouse can't know their won date.",
+      "value": 22.5
     },
     "dispute_return_rate": {
       "definition": "Disputes plus returns opened in the golden month / succeeded transactions in the golden month.",
@@ -80,19 +80,19 @@
     },
     "net_revenue_12m_per_account_by_lead_source": {
       "accounts": {
-        "inbound": 57,
+        "inbound": 56,
         "outbound": 20,
         "paid": 27,
-        "partner": 17,
-        "unknown": 7
+        "partner": 16,
+        "unknown": 9
       },
-      "definition": "For accounts that went live inside the data window and on or before 2025-10-31: net revenue in their first 12 calendar months from the go-live month; the median per account, by the lead source of the account's first won opportunity (missing -> unknown). Median, not mean, so one very large account cannot decide the comparison.",
+      "definition": "For accounts that went live inside the data window and on or before 2025-10-31: net revenue in their first 12 calendar months from the go-live month; the median per account, by the lead source of the account's first won opportunity (missing, or no CRM match -> unknown). Median, not mean, so one very large account cannot decide the comparison.",
       "value": {
-        "inbound": 17854.844001,
+        "inbound": 16291.41038,
         "outbound": 23462.33215,
         "paid": 8609.239581,
-        "partner": 52151.934988,
-        "unknown": 12476.1543
+        "partner": 55239.433046,
+        "unknown": 21355.48953
       }
     },
     "net_revenue_retention": {

@@ -45,7 +45,7 @@
   "metrics": {
     "activation_days": {
       "accounts": 15,
-      "definition": "Median days from won date (close_date of the account's first won opportunity) to its first succeeded transaction, for accounts won in calendar 2025 that have transacted.",
+      "definition": "Median days from won date (close_date of the account's first won opportunity) to its first succeeded transaction, for accounts won in calendar 2025 that have transacted. Customers with no CRM match are excluded: the warehouse can't know their won date.",
       "value": 41.0
     },
     "dispute_return_rate": {
@@ -85,7 +85,7 @@
         "paid": 2,
         "partner": 5
       },
-      "definition": "For accounts that went live inside the data window and on or before 2025-10-31: net revenue in their first 12 calendar months from the go-live month; the median per account, by the lead source of the account's first won opportunity (missing -> unknown). Median, not mean, so one very large account cannot decide the comparison.",
+      "definition": "For accounts that went live inside the data window and on or before 2025-10-31: net revenue in their first 12 calendar months from the go-live month; the median per account, by the lead source of the account's first won opportunity (missing, or no CRM match -> unknown). Median, not mean, so one very large account cannot decide the comparison.",
       "value": {
         "inbound": 10347.141422,
         "outbound": 4835.744675,

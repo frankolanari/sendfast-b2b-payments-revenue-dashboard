@@ -30,3 +30,12 @@ _Withdrawn 2026-11-24: the owner set UTC everywhere (PLAN.md D15), the HubSpot m
   pricing is keyed by the billing customer (Stripe customer id), not the CRM account, so the ~2% of
   customers with no CRM match still have pricing and usage revenue. Changelog entry in
   `contract/CHANGELOG.md`. Approved by the owner on 2026-11-24 (rule 1a).
+
+- **2026-11-24, Stage 5 (APPROVED by the owner 2026-11-24):** answer key definitions changed for
+  `activation_days` and `net_revenue_12m_per_account_by_lead_source`. The key used the generator's
+  hidden truth for the 7 customers (2%) that can't be matched from CRM to billing; the warehouse
+  can't know their won date or lead source. Now activation excludes them, and lead source counts
+  them as `unknown` (revenue kept), matching `dim_accounts`. Full-scale values moved (activation
+  22.0 -> 22.5 days over 118 accounts; inbound, partner and unknown medians); scale 0.1 values are
+  unchanged. The marts and the SQL were not changed to fit. Approved by the owner on 2026-11-24
+  (rule 1a).

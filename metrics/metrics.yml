@@ -410,7 +410,8 @@ metrics:
     label: Activation (days)
     definition: >-
       Median days from won date (close_date of the account's first won opportunity) to its first
-      succeeded transaction, for accounts won in calendar 2025 that have transacted.
+      succeeded transaction, for accounts won in calendar 2025 that have transacted. Customers with
+      no CRM match are excluded: the warehouse can't know their won date.
     grain: year
     unit: days
     mart: dim_accounts
@@ -539,8 +540,8 @@ metrics:
     definition: >-
       For accounts that went live inside the data window and on or before 2025-10-31: net revenue in
       their first 12 calendar months from the go-live month; the median per account, by the lead
-      source of the account's first won opportunity (missing -> unknown). Median, not mean, so one
-      very large account cannot decide the comparison.
+      source of the account's first won opportunity (missing, or no CRM match -> unknown). Median,
+      not mean, so one very large account cannot decide the comparison.
     grain: cohort
     unit: usd
     mart: dim_accounts
