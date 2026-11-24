@@ -1,0 +1,585 @@
+# The metric dictionary (PLAN.md Stage 5): one written definition per metric.
+# Each `definition` is copied word for word from the answer key (generator/answer_keys/*.json);
+# scripts/golden_check.py fails if the two ever differ, so the spec and the key can't drift.
+#
+# golden.query runs against the analytics marts only, as the bi_reader role (what BI sees).
+# Business rules (exclusions, revenue components, at-risk flags, cycle and activation days,
+# churn types) live in the marts; a query only filters and aggregates mart columns.
+# Its `value` column is compared with the key's `value`; any other column it returns is
+# compared with the key field of the same name. Tolerances are absolute. The answer key
+# rounds to 6 decimal places, so ratios get 1e-6 and money gets a cent; days and counts
+# must match exactly.
+# Query parameters (psycopg2 %(name)s) come from `periods` below and are checked against the
+# answer key's meta, so a new key with other dates can't silently pass against old ones.
+
+version: 1
+periods:
+  as_of: "2026-10-31" # fixed (D11); never now()
+  window_start: "2024-11-01" # first day of the 24-month data window
+  golden_month_start: "2026-09-01"
+  golden_month_end: "2026-09-30"
+  prior_month_start: "2025-09-01" # golden month minus 12
+  prior_month_end: "2025-09-30"
+  t12_start: "2025-11-01" # trailing 12 months, as of the as-of date
+  t12_end: "2026-10-31"
+  year_2025_start: "2025-01-01"
+  year_2025_end: "2025-12-31"
+  at_risk_window_start: "2026-06-01" # the 3 months before the golden month
+  live_by: "2025-10-31" # cohort cut-off for the 12-month revenue metric
+  silent_churn_cutoff: "2026-09-01" # as-of minus 60 days
+
+metrics:
+  # ── Pipeline and sales ───────────────────────────────────────────────
+  - name: pipeline_created_usd
+    label: Pipeline created
+    definition: >-
+      Sum of amount_usd of opportunities created in the golden month (null amounts excluded).
+    grain: month
+    unit: usd
+    mart: fct_opportunities
+    column: amount_usd
+    owner: Sales
+    edge_cases:
+      - Opportunities with no amount count toward `opportunities` but add nothing.
+      - Opportunities on test and internal accounts are excluded (fct_opportunities).
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        select
+            coalesce(sum(amount_usd), 0) as value,
+            count(*) as opportunities
+        from analytics.fct_opportunities
+        where created_date between %(golden_month_start)s and %(golden_month_end)s
+
+  - name: lead_to_opp_conversion
+    label: Lead to opportunity conversion
+    definition: >-
+      Share of leads created in calendar 2025 (UTC) that have converted_at set.
+    grain: year
+    unit: ratio
+    mart: fct_leads_funnel
+    column: is_converted
+    owner: Marketing
+    edge_cases:
+      - Leads on test and internal accounts are excluded.
+      - A missing lead source is reported as `unknown`; it doesn't change the rate.
+    golden:
+      window: calendar_2025
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        select
+            avg(case when is_converted then 1.0 else 0.0 end) as value,
+            count(*) as leads
+        from analytics.fct_leads_funnel
+        where created_date between %(year_2025_start)s and %(year_2025_end)s
+
+  - name: win_rate
+    label: Win rate
+    definition: >-
+      Won / closed (won + lost) opportunities with close_date in the trailing 12 months
+      (2025-11-01..2026-10-31).
+    grain: trailing_12_months
+    unit: ratio
+    mart: fct_opportunities
+    column: is_won
+    owner: Sales
+    edge_cases:
+      - Open opportunities are not in the denominator.
+      - Closed rows with an invalid close date still count (only the sales cycle drops them).
+    golden:
+      window: trailing_12_months
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        select
+            avg(case when is_won then 1.0 else 0.0 end) as value,
+            count(*) as closed,
+            sum(case when is_won then 1 else 0 end) as won
+        from analytics.fct_opportunities
+        where is_closed and close_date between %(t12_start)s and %(t12_end)s
+
+  - name: sales_cycle_days
+    label: Sales cycle (days)
+    definition: >-
+      Median days from created_at (UTC date) to close_date for won opportunities closed in the
+      trailing 12 months, excluding rows whose close_date is before their created date.
+    grain: trailing_12_months
+    unit: days
+    mart: fct_opportunities
+    column: sales_cycle_days
+    owner: Sales
+    edge_cases:
+      - Rows whose close date is before their created date are dirty CRM data and are excluded.
+      - Median, not mean.
+    golden:
+      window: trailing_12_months
+      expected: from_answer_key
+      tolerance: 0
+      query: |
+        select
+            percentile_cont(0.5) within group (order by sales_cycle_days) as value,
+            count(*) as opportunities
+        from analytics.fct_opportunities
+        where
+            is_won
+            and not has_invalid_close_date
+            and close_date between %(t12_start)s and %(t12_end)s
+
+  - name: sales_velocity_usd_per_day
+    label: Sales velocity (USD per day)
+    definition: >-
+      open opportunities x average won amount_usd (trailing 12 months) x win_rate /
+      sales_cycle_days, as of 2026-10-31.
+    grain: as_of
+    unit: usd_per_day
+    mart: fct_opportunities
+    column: amount_usd
+    owner: Sales
+    edge_cases:
+      - Uses the win rate and sales cycle exactly as defined above.
+      - The average won amount ignores won opportunities with no amount.
+    golden:
+      window: as_of
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        with won_t12 as (
+            select
+                avg(amount_usd) as avg_won_amount_usd,
+                percentile_cont(0.5) within group (order by sales_cycle_days)
+                filter (where not has_invalid_close_date) as cycle_days
+            from analytics.fct_opportunities
+            where is_won and close_date between %(t12_start)s and %(t12_end)s
+        ),
+        win as (
+            select avg(case when is_won then 1.0 else 0.0 end) as win_rate
+            from analytics.fct_opportunities
+            where is_closed and close_date between %(t12_start)s and %(t12_end)s
+        ),
+        open_now as (
+            select count(*) as open_opportunities
+            from analytics.fct_opportunities
+            where is_open
+        )
+        select
+            open_now.open_opportunities * won_t12.avg_won_amount_usd * win.win_rate
+            / won_t12.cycle_days as value,
+            open_now.open_opportunities,
+            won_t12.avg_won_amount_usd
+        from won_t12 cross join win cross join open_now
+
+  # ── Volume and revenue ───────────────────────────────────────────────
+  - name: total_payment_volume_usd
+    label: Total payment volume (TPV)
+    definition: >-
+      Sum of succeeded transaction amounts in USD (amount / FX rate of the source currency on the
+      transaction's UTC date) in the golden month.
+    grain: month
+    unit: usd
+    mart: fct_account_daily
+    column: volume_usd
+    owner: Finance
+    edge_cases:
+      - Failed and reversed transactions are not volume.
+      - Orphan merchants (in the ledger only) and test/internal accounts are excluded.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        select
+            sum(volume_usd) as value,
+            sum(succeeded_count) as transactions
+        from analytics.fct_account_daily
+        where activity_month = %(golden_month_start)s
+
+  - name: net_revenue_usd
+    label: Net revenue
+    definition: >-
+      Platform fee (invoice lines for the month) + usage fee (succeeded USD volume x fee_bps
+      effective on the transaction date) + FX margin (cross-currency succeeded USD volume x
+      fx_margin_bps) + minimum-commit true-up (invoice lines whose period is the month), golden
+      month.
+    grain: month
+    unit: usd
+    mart: fct_revenue_monthly
+    column: net_revenue_usd
+    owner: Finance
+    edge_cases:
+      - Pricing is the billing customer's, effective on the transaction date (contract 2.0.0).
+      - Customers with no CRM match still earn revenue (as `billing:<customer id>` accounts).
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        select
+            sum(net_revenue_usd) as value,
+            sum(platform_fee_usd) as platform_fee,
+            sum(usage_fee_usd) as usage_fee,
+            sum(fx_margin_usd) as fx_margin,
+            sum(true_up_usd) as true_up
+        from analytics.fct_revenue_monthly
+        where revenue_month = %(golden_month_start)s
+
+  - name: take_rate
+    label: Take rate
+    definition: >-
+      net_revenue_usd / total_payment_volume_usd, golden month.
+    grain: month
+    unit: ratio
+    mart: fct_revenue_monthly
+    column: net_revenue_usd
+    owner: Finance
+    edge_cases:
+      - Both sides use the same exclusions as net revenue and TPV.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        select
+            (
+                select sum(net_revenue_usd)
+                from analytics.fct_revenue_monthly
+                where revenue_month = %(golden_month_start)s
+            )
+            / (
+                select sum(volume_usd)
+                from analytics.fct_account_daily
+                where activity_month = %(golden_month_start)s
+            ) as value
+
+  - name: platform_mrr_usd
+    label: Platform MRR
+    definition: >-
+      Sum of platform-fee invoice lines whose period is the golden month.
+    grain: month
+    unit: usd
+    mart: fct_revenue_monthly
+    column: platform_fee_usd
+    owner: Finance
+    edge_cases:
+      - Usage fees, FX margin and true-ups are not MRR.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        select sum(platform_fee_usd) as value
+        from analytics.fct_revenue_monthly
+        where revenue_month = %(golden_month_start)s
+
+  - name: net_revenue_retention
+    label: Net revenue retention (NRR)
+    definition: >-
+      Net revenue in the golden month from accounts live (went_live_at) on or before the end of the
+      month 12 months earlier, divided by those accounts' net revenue in that earlier month. Churned
+      accounts count as zero; reactivated accounts count.
+    grain: month
+    unit: ratio
+    mart: fct_revenue_monthly
+    column: net_revenue_usd
+    owner: RevOps
+    edge_cases:
+      - Reactivated accounts count toward the numerator.
+      - Test and internal accounts are excluded.
+      - The base is every account live by the earlier month's end, whether or not it earned then.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        with base as (
+            select account_id
+            from analytics.dim_accounts
+            where is_customer and not is_excluded and live_date <= %(prior_month_end)s
+        ),
+        revenue as (
+            select
+                base.account_id,
+                coalesce(sum(r.net_revenue_usd) filter (where r.revenue_month = %(golden_month_start)s), 0) as now_usd,
+                coalesce(sum(r.net_revenue_usd) filter (where r.revenue_month = %(prior_month_start)s), 0) as then_usd
+            from base
+            left join analytics.fct_revenue_monthly as r on base.account_id = r.account_id
+            group by base.account_id
+        )
+        select
+            sum(now_usd) / sum(then_usd) as value,
+            count(*) as accounts
+        from revenue
+
+  - name: gross_revenue_retention
+    label: Gross revenue retention (GRR)
+    definition: >-
+      As NRR, but each account's golden-month revenue is capped at its revenue 12 months earlier.
+    grain: month
+    unit: ratio
+    mart: fct_revenue_monthly
+    column: net_revenue_usd
+    owner: RevOps
+    edge_cases:
+      - Expansion is capped per account, so GRR is never above 1.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        with base as (
+            select account_id
+            from analytics.dim_accounts
+            where is_customer and not is_excluded and live_date <= %(prior_month_end)s
+        ),
+        revenue as (
+            select
+                base.account_id,
+                coalesce(sum(r.net_revenue_usd) filter (where r.revenue_month = %(golden_month_start)s), 0) as now_usd,
+                coalesce(sum(r.net_revenue_usd) filter (where r.revenue_month = %(prior_month_start)s), 0) as then_usd
+            from base
+            left join analytics.fct_revenue_monthly as r on base.account_id = r.account_id
+            group by base.account_id
+        )
+        select sum(least(now_usd, then_usd)) / sum(then_usd) as value
+        from revenue
+
+  # ── Churn and activation ─────────────────────────────────────────────
+  - name: logo_churn_contract
+    label: Logo churn (contract)
+    definition: >-
+      Accounts live by 2025-10-31 and not contract-churned by then, whose subscription ended in the
+      trailing 12 months, as a share of those accounts.
+    grain: trailing_12_months
+    unit: ratio
+    mart: dim_accounts
+    column: contract_end_date
+    owner: RevOps
+    edge_cases:
+      - Silent churn (stopped transacting, contract still open) is a separate metric.
+    golden:
+      window: trailing_12_months
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        with base as (
+            select contract_end_date
+            from analytics.dim_accounts
+            where
+                is_customer
+                and not is_excluded
+                and live_date < %(t12_start)s
+                and (contract_end_date is null or contract_end_date >= %(t12_start)s)
+        )
+        select
+            avg(case when contract_end_date between %(t12_start)s and %(t12_end)s then 1.0 else 0.0 end)
+            as value,
+            sum(case when contract_end_date between %(t12_start)s and %(t12_end)s then 1 else 0 end)
+            as churned,
+            count(*) as base
+        from base
+
+  - name: logo_churn_silent
+    label: Logo churn (silent)
+    definition: >-
+      Live accounts with no contract end whose last succeeded transaction is on or before 2026-09-01
+      (60 days before the as-of date).
+    grain: as_of
+    unit: accounts
+    mart: dim_accounts
+    column: churn_type
+    owner: RevOps
+    edge_cases:
+      - Accounts that went live but never transacted are not silent churn.
+    golden:
+      window: as_of
+      expected: from_answer_key
+      tolerance: 0
+      query: |
+        select count(*) as value
+        from analytics.dim_accounts
+        where
+            is_customer
+            and not is_excluded
+            and live_date is not null
+            and contract_end_date is null
+            and churn_type = 'silent'
+
+  - name: activation_days
+    label: Activation (days)
+    definition: >-
+      Median days from won date (close_date of the account's first won opportunity) to its first
+      succeeded transaction, for accounts won in calendar 2025 that have transacted.
+    grain: year
+    unit: days
+    mart: dim_accounts
+    column: activation_days
+    owner: Onboarding
+    edge_cases:
+      - Accounts with no CRM match have no won date, so the warehouse can't place them.
+    golden:
+      window: calendar_2025
+      expected: from_answer_key
+      tolerance: 0
+      query: |
+        select
+            percentile_cont(0.5) within group (order by activation_days) as value,
+            count(*) as accounts
+        from analytics.dim_accounts
+        where
+            is_customer
+            and not is_excluded
+            and activation_days is not null
+            and won_date between %(year_2025_start)s and %(year_2025_end)s
+
+  # ── Risk ─────────────────────────────────────────────────────────────
+  - name: failure_rate
+    label: Failure rate
+    definition: >-
+      Failed / all transactions (any status) in the golden month.
+    grain: month
+    unit: ratio
+    mart: fct_account_daily
+    column: failed_count
+    owner: Payments Ops
+    edge_cases:
+      - Reversed transactions are in the denominator, not the numerator.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        select
+            sum(failed_count) * 1.0 / sum(txn_count) as value,
+            sum(txn_count) as transactions
+        from analytics.fct_account_daily
+        where activity_month = %(golden_month_start)s
+
+  - name: dispute_return_rate
+    label: Dispute and return rate
+    definition: >-
+      Disputes plus returns opened in the golden month / succeeded transactions in the golden month.
+    grain: month
+    unit: ratio
+    mart: fct_account_daily
+    column: disputes_opened
+    owner: Payments Ops
+    edge_cases:
+      - A dispute counts in the month it was opened, not the month of the transaction.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        select
+            sum(disputes_opened + returns_opened) * 1.0 / sum(succeeded_count) as value,
+            sum(disputes_opened) as disputes,
+            sum(returns_opened) as returns
+        from analytics.fct_account_daily
+        where activity_month = %(golden_month_start)s
+
+  - name: top10_revenue_concentration
+    label: Top-10 revenue concentration
+    definition: >-
+      Share of trailing-12-month net revenue earned from the 10 accounts with the most.
+    grain: trailing_12_months
+    unit: ratio
+    mart: fct_revenue_monthly
+    column: net_revenue_usd
+    owner: Finance
+    edge_cases:
+      - Ranked by trailing-12-month net revenue, not by volume.
+    golden:
+      window: trailing_12_months
+      expected: from_answer_key
+      tolerance: 0.000001
+      query: |
+        with per_account as (
+            select account_id, sum(net_revenue_usd) as revenue_usd
+            from analytics.fct_revenue_monthly
+            where revenue_month between %(t12_start)s and %(t12_end)s
+            group by account_id
+        ),
+        ranked as (
+            select revenue_usd, row_number() over (order by revenue_usd desc) as revenue_rank
+            from per_account
+        )
+        select sum(revenue_usd) filter (where revenue_rank <= 10) / sum(revenue_usd) as value
+        from ranked
+
+  - name: revenue_at_risk_usd
+    label: Revenue at risk
+    definition: >-
+      Accounts live before 2026-06-01 and not contract-churned by the end of the golden month are at
+      risk if golden-month volume < 0.5 x their average monthly volume over the previous 3 months,
+      or golden-month failure rate > 0.1 on at least 20 transactions. Revenue at risk = their
+      average monthly net revenue over those 3 months.
+    grain: month
+    unit: usd
+    mart: fct_account_health_monthly
+    column: revenue_at_risk_usd
+    owner: Customer Success
+    edge_cases:
+      - The at-risk rule lives in fct_account_health_monthly (dbt vars at_risk_*), shared with the key.
+    golden:
+      window: golden_month
+      expected: from_answer_key
+      tolerance: 0.01
+      query: |
+        select
+            sum(revenue_at_risk_usd) as value,
+            sum(case when is_at_risk then 1 else 0 end) as accounts
+        from analytics.fct_account_health_monthly
+        where month_start = %(golden_month_start)s
+
+  # ── 12-month net revenue by lead source ─────────────────────────────
+  - name: net_revenue_12m_per_account_by_lead_source
+    label: 12-month net revenue per account, by lead source
+    definition: >-
+      For accounts that went live inside the data window and on or before 2025-10-31: net revenue in
+      their first 12 calendar months from the go-live month; the median per account, by the lead
+      source of the account's first won opportunity (missing -> unknown). Median, not mean, so one
+      very large account cannot decide the comparison.
+    grain: cohort
+    unit: usd
+    mart: dim_accounts
+    column: lead_source
+    owner: Marketing
+    edge_cases:
+      - Accounts with no CRM match have no lead source in the warehouse, so they land in `unknown`.
+      - Median, not mean.
+    golden:
+      window: live_by_2025_10_31
+      expected: from_answer_key
+      tolerance: 0.01
+      by: lead_source # the value is a map: one row per lead source
+      query: |
+        with cohort as (
+            select account_id, lead_source, date_trunc('month', live_date)::date as live_month
+            from analytics.dim_accounts
+            where
+                is_customer
+                and not is_excluded
+                and live_date between %(window_start)s and %(live_by)s
+        ),
+        first_12 as (
+            select
+                cohort.account_id,
+                cohort.lead_source,
+                coalesce(sum(r.net_revenue_usd), 0) as revenue_usd
+            from cohort
+            left join analytics.fct_revenue_monthly as r
+                on
+                    cohort.account_id = r.account_id
+                    and r.revenue_month >= cohort.live_month
+                    and r.revenue_month < cohort.live_month + interval '12 months'
+            group by cohort.account_id, cohort.lead_source
+        )
+        select
+            lead_source,
+            percentile_cont(0.5) within group (order by revenue_usd) as value,
+            count(*) as accounts
+        from first_12
+        group by lead_source
+        order by lead_source

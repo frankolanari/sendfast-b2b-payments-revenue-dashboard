@@ -113,6 +113,8 @@ jobs:
         run: make generate SCALE=0.1
       - name: compile maps, apply roles, dbt build (all tests)
         run: make transform CRM=hubspot
+      - name: golden numbers (answer key vs marts, scale 0.1 key)
+        run: make golden SCALE=0.1
       - name: dbt docs (lineage)
         run: make dbt-docs
       - uses: actions/upload-artifact@v7
