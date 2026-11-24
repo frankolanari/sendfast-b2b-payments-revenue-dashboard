@@ -10,6 +10,7 @@ One line per gate pass (PLAN.md Section 4A). Approved exceptions are listed with
 | G3   | 2026-11-24 | `4afeb25` | none (test change withdrawn, see below)                                  |
 | G4   | 2026-11-24 | `e6b3787` | contract 2.0.0; three version-relative tests (approved, see below)       |
 | G5   | 2026-11-24 | `8526e8f` | answer key: activation and lead-source definitions (approved, see below) |
+| G6   | 2026-11-24 | `c7a081b` | none (owner sign-off: cross-filter screenshots in docs/evidence/gate-6)  |
 
 ## Exceptions
 

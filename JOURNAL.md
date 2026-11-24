@@ -285,6 +285,20 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **What happened:** Gate 6 needs the owner to confirm cross-filtering on the native dashboards. Evidence is in `docs/evidence/gate-6/` (6 screenshots and a README): clicking a lead source bar filters Pipeline & funnel; clicking the USD-NGN spike filters Account health & risk to that corridor; clicking the top account opens Account 360 for it. Under the owner's standing rule, the agent saved the evidence and carried on; the owner can object afterwards.
 **Tags:** #skill
 
+## 2026-11-24 · Stage 6 · Gate 6 passed in CI and merged
+**Type:** gate-pass
+**What happened:** All 8 CI checks green on PR #8. The new `metabase` job's log shows a fresh bootstrap (79 objects, 10.7 s), a rerun with no changes and the three-way golden check at 19/19 on the 0.1 key. Merged and tagged `gate-6` on `c7a081b` after checking the merge commit carries the cards, dashboards, scripts and evidence. `metabase` is now a required check on `main` (8 in all). The tag push hit the credential flake once; a retry worked. Owner sign-off evidence: `docs/evidence/gate-6/`.
+**Evidence:** PR #8, tag `gate-6` on `c7a081b`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 7 · Owner decision: the chart library
+**Type:** decision
+**What happened:** The owner named the two candidates held back since planning: shadcn.io charts (primary) and EvilCharts' ECharts components (secondary). The agent checked both against the plan's five criteria from the sites themselves and npm, and recorded the table in PLAN.md (Stage 7, D9). Primary: funnel, waterfall and Sankey are native; the heatmap is calendar-only, so the cohort heatmap is our own small component. Secondary is Apache ECharts underneath, so it doubles as the plan's fallback.
+**Surprise:** shadcn.io's install command carries the account holder's personal token. The agent must never handle a credential, so the owner runs the chart installs once; after that the code is ordinary source in the repo and CI needs nothing.
+**Options considered / pushback:** Plain shadcn/ui charts (Recharts) were not on the owner's list. ECharts alone covers every type but looks stock without heavy theming.
+**Generic vs specific (#skill):** generic: an install step that needs a personal account is a human step; schedule it, write the exact command, and keep the result as source so CI never needs the account. Specific: the two libraries.
+**Tags:** #article #skill
+
 ---
 
 ## Owner notes
@@ -325,4 +339,4 @@ _(Your own words, any time. Rough is fine.)_
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
 | 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
-| 6 Metabase | 2026-11-24 | pending CI | 2 | stale API key within one make run; activation clipped by the window |
+| 6 Metabase | 2026-11-24 | 2026-11-24 | 2 | stale API key within one make run; activation clipped by the window |

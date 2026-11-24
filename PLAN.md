@@ -27,7 +27,7 @@ Supersedes v1 (`metabase-portfolio-plan.md`). Drop this file into the repo root 
 | D6 | **dbt Core** (dbt-postgres) for staging → intermediate → marts, plus tests | Tests, lineage, docs, and an industry-standard keyword |
 | D7 | **All metric logic lives in SQL marts.** The YAML metric dictionary is the spec plus expected values. Metabase metrics/measures are only for simple additive metrics | Metabase metrics are query-builder-only and limited to one table. NRR, cohorts and velocity need SQL |
 | D8 | **Metabase content as code:** React-facing questions are native SQL files in the repo, created idempotently through the API | Serialization and remote sync are paid. Native SQL cards move cleanly between instances |
-| D9 | Charts: **OPEN — owner decides at Stage 7.** Two preferred candidates to be named by the owner; Apache ECharts is the fallback. UI: **Radix primitives + Tailwind**, driven by our own tokens. Data fetching: **TanStack Query** | Choose against the chart-library criteria in Stage 7 |
+| D9 | Charts: **shadcn.io charts (primary, on TanStack Charts); EvilCharts' Apache ECharts components (secondary/fallback).** Owner decision, 2026-11-24; reasons in Stage 7. UI: **Radix primitives + Tailwind**, driven by our own tokens. Data fetching: **TanStack Query** | Chosen against the chart-library criteria in Stage 7 |
 | D10 | Four pages: **Pipeline & funnel**, **Revenue & retention** (incl. activation), **Account health & risk**, **Account 360** (drill target). The rep deep dive becomes a filter on page 1 | The full loop is better shown by one account's timeline than by a fourth summary page |
 | D11 | **Fixed as-of date** for all data: `2026-10-31`, with 24 months of history. Never use `now()` | Deterministic data, tests and screenshots |
 | D12 | **The AI boundary is enforced, not just a rule.** Production credentials never live in the repo, in CI, or anywhere the coding agent can read | This is what makes the privacy claim credible |
@@ -463,6 +463,17 @@ where 1=1
 - `web/`:
   - `design/tokens.ts`: colors (colorblind-safe chart palette, max 8 series), type scale, spacing, radii. Tailwind reads from these tokens.
   - **Chart library decision (owner, at the start of this stage).** Judge each candidate on: (1) can it draw funnel, waterfall, cohort heatmap and Sankey, natively or with little custom work; (2) can it read colors, fonts and spacing from `design/tokens.ts`; (3) does it support React 19 and TypeScript; (4) does it look distinct out of the box rather than like a stock template; (5) bundle size and maintenance activity. Record the choice and reasons here. Fallback: Apache ECharts.
+  - **Decision (owner, 2026-11-24): primary [shadcn.io charts](https://www.shadcn.io/charts), secondary [EvilCharts ECharts components](https://evilcharts.com/docs/echarts/components).** Checked by the agent against the five criteria, from each site and npm on 2026-11-24:
+
+    | Criterion | shadcn.io charts (primary) | EvilCharts ECharts (secondary) |
+    |---|---|---|
+    | 1. Funnel, waterfall, cohort heatmap, Sankey | Funnel, waterfall (built for revenue bridges, with subtotals) and Sankey are native. Its heatmap is a GitHub-style calendar, not a cohort x month grid, so `CohortHeatmap` is our own small component on the chart kit | Sankey and a calendar heatmap; no funnel or waterfall component (raw ECharts can draw all four) |
+    | 2. Reads our tokens | Installs as source drawn in the shadcn/ui theme's CSS variables; `design/tokens.ts` generates those variables | Same shadcn/ui config contract and CSS variables |
+    | 3. React 19 + TypeScript | `@tanstack/charts` 1.5.0 peers `react ^18 \|\| ^19`; TS source | ECharts 6.1.0 typed; components are TS source |
+    | 4. Distinct look | Yes (bklit-ui design, MIT, rebuilt on TanStack Charts) | Yes |
+    | 5. Size, maintenance | `@tanstack/charts` 3.0 MB unpacked, updated 2026-11-07; charts use d3 modules (e.g. d3-sankey) | `echarts` 60 MB unpacked (tree-shakeable), Apache-2.0; EvilCharts MIT, 3.2k stars, pushed 2026-10-29 |
+
+    How it's used: every chart sits behind our wrapper components, so a chart can move to the secondary without touching a page. The secondary is the fallback the plan already named (it *is* Apache ECharts), for anything the primary can't draw well. One catch: shadcn.io's install command carries the account holder's personal token, so the **owner** runs the chart installs once (the agent never handles the token); after that the charts are plain source in `web/`, and CI needs no account.
   - Chart components built on the chosen library, behind our own wrapper API so the library can be swapped: `KpiTile`, `TrendLine`, `Funnel`, `Waterfall`, `CohortHeatmap`, `Sankey`, `BarBreakdown`, `DataTable`. Each one has loading, empty and error states.
   - Formatting helpers: currency (`$1.2M`, `₦`), percentages, basis points, durations.
   - Filter state in the URL (shareable links). A global filter bar drives all cards on a page.
