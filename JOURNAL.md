@@ -229,6 +229,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: contract-derived dbt tests, identity map pattern (explicit id then unique domain), exclusions as one macro, a role script using psql \gexec, an at-risk rule shared by answer key and mart. Specific: payments revenue components, corridors, Stripe/ledger shapes.
 **Tags:** #linkedin #article #case-study #skill
 
+## 2026-11-24 · Stage 4 · Gate 4 passed in CI, merged, and two exceptions approved
+**Type:** gate-pass
+**What happened:** All 7 CI checks green on PR #6 (lint, secrets, contract-check, unit, compiled-up-to-date, generator, integration). Merged to `main` and tagged `gate-4` on `e6b3787`; `integration` is now a required check. The owner approved both items left pending: contract 2.0.0 (pricing keyed by the billing customer) and the three version-relative test changes. Both are logged as approved exceptions in `docs/gates/log.md`.
+**Why it matters:** The decision the owner declined to make mid-stage (which key pricing hangs off) got an explicit yes at the gate. Going ahead with a flagged recommendation worked, but only because the flag forced a review before the next stage built on it.
+**Evidence:** PR #6, tag `gate-4` on `e6b3787`, `docs/gates/log.md`.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -267,4 +274,4 @@ _(Your own words, any time. Rough is fine.)_
 | 1 Contract | 2026-11-23 | 2026-11-23 | 3 | validator caught a YAML bug in the contract |
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
-| 4 Transformations | 2026-11-24 | pending CI | 4 | reserved word, sqlfluff macros, version-pinned tests |
+| 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
