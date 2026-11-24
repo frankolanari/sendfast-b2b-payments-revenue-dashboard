@@ -3,7 +3,7 @@
 # Any semantic change needs a version bump and a CHANGELOG.md entry (`make contract-check`).
 # contract/data_dictionary.md is generated from this file: never edit it by hand.
 
-contract_version: 1.0.0
+contract_version: 2.0.0
 
 conventions:
   - All timestamps are `timestamptz` in UTC. Dates are calendar dates in UTC.
@@ -744,15 +744,15 @@ tables:
 
   - name: stg_rates__pricing_rates
     source: rates
-    description: Per-account pricing with effective dates. A renegotiation adds a new row; it never edits an old one.
-    grain: one row per account per pricing period
-    primary_key: [account_ref, effective_from]
+    description: Per-customer pricing with effective dates, kept with billing. A renegotiation adds a new row; it never edits an old one.
+    grain: one row per billing customer per pricing period
+    primary_key: [billing_customer_id, effective_from]
     columns:
       - {
-          name: account_ref,
+          name: billing_customer_id,
           type: text,
           nullable: false,
-          description: CRM account the pricing applies to.,
+          description: Billing customer the pricing applies to.,
         }
       - {
           name: fee_bps,
@@ -792,6 +792,6 @@ tables:
         }
     foreign_keys:
       - {
-          columns: [account_ref],
-          references: { table: stg_crm__accounts, columns: [account_id] },
+          columns: [billing_customer_id],
+          references: { table: stg_billing__customers, columns: [customer_id] },
         }

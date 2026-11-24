@@ -18,3 +18,9 @@ _Withdrawn 2026-11-24: the owner set UTC everywhere (PLAN.md D15), the HubSpot m
   changed. It asserted the HubSpot map's old timezone (`UTC`); the map deliberately moved to
   `America/New_York`. The test now reads the timezone from the map and also checks that a different
   timezone changes the SQL: stricter, not weaker. Needs the owner's approval under rule 1a.
+
+- **2026-11-24, Stage 4 (pending owner review):** three tests pinned contract version numbers that
+  the 2.0.0 contract bump moved: `test_rejects_newer_or_other_major_contract_version`,
+  `test_change_with_bump_is_accepted`, `test_version_going_backwards_is_rejected`. Each now computes
+  its versions relative to the current contract (same intent; the first now checks both a newer
+  and an older major). The checker code is unchanged. Needs the owner's approval under rule 1a.

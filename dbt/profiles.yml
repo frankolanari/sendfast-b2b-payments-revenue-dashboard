@@ -7,8 +7,8 @@ sendfast:
       host: "{{ env_var('DATA_DB_HOST', 'localhost') }}"
       port: "{{ env_var('DATA_DB_HOST_PORT', '55432') | as_number }}"
       dbname: "{{ env_var('DATA_DB_NAME', 'sendfast') }}"
-      user: "{{ env_var('DBT_USER', 'transformer') }}"
-      password: "{{ env_var('DBT_PASSWORD', '') }}"
+      user: "{{ env_var('TRANSFORMER_USER', 'transformer') }}" # the transformer role (deploy/sql/roles.sql)
+      password: "{{ env_var('TRANSFORMER_PASSWORD', '') }}"
       schema: analytics
       sslmode: "{{ env_var('DATA_DB_SSLMODE', 'disable') }}"
       threads: 4

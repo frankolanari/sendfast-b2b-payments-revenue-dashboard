@@ -3,7 +3,7 @@
 
 # Data dictionary
 
-Schema contract version **1.0.0**. 15 canonical staging tables.
+Schema contract version **2.0.0**. 15 canonical staging tables.
 
 ## Conventions
 
@@ -310,14 +310,14 @@ Daily FX rates. One unit of base_currency equals `rate` units of quote_currency.
 
 ### stg_rates__pricing_rates
 
-Per-account pricing with effective dates. A renegotiation adds a new row; it never edits an old one.
+Per-customer pricing with effective dates, kept with billing. A renegotiation adds a new row; it never edits an old one.
 
-- **Grain:** one row per account per pricing period
-- **Primary key:** `account_ref`, `effective_from`
+- **Grain:** one row per billing customer per pricing period
+- **Primary key:** `billing_customer_id`, `effective_from`
 
 | Column | Type | Nullable | Allowed values | Description |
 | --- | --- | --- | --- | --- |
-| `account_ref` | text | no |  | CRM account the pricing applies to. |
+| `billing_customer_id` | text | no |  | Billing customer the pricing applies to. |
 | `fee_bps` | numeric | no |  | Usage fee in basis points of USD volume. |
 | `fx_margin_bps` | numeric | no |  | FX margin in basis points, applied to cross-currency volume. |
 | `platform_fee_usd` | numeric | no |  | Monthly platform fee in USD. |
@@ -327,4 +327,4 @@ Per-account pricing with effective dates. A renegotiation adds a new row; it nev
 
 **Foreign keys**
 
-- `account_ref` → [`stg_crm__accounts`](#stg_crm__accounts).`account_id`
+- `billing_customer_id` → [`stg_billing__customers`](#stg_billing__customers).`customer_id`

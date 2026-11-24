@@ -18,7 +18,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from contract_check import CONTRACT_PATH, load_yaml, parse_version
+from contract_check import CONTRACT_PATH, dbt_model_entry, load_yaml, parse_version
 
 ROOT = Path(__file__).resolve().parent.parent
 MAPPINGS_DIR = ROOT / "mappings" / "crm"
@@ -344,34 +344,8 @@ def compile_sources(m: dict[str, Any], contract: dict[str, Any]) -> str:
 
 
 def compile_tests(m: dict[str, Any], contract: dict[str, Any]) -> str:
-    """dbt tests derived from the contract: not_null, unique, accepted_values, relationships."""
-    models = []
-    for table in crm_tables(contract).values():
-        fk_by_col = {
-            fk["columns"][0]: fk["references"]
-            for fk in table.get("foreign_keys", [])
-            if len(fk["columns"]) == 1
-        }
-        cols = []
-        for col in table["columns"]:
-            tests: list[Any] = []
-            if not col["nullable"]:
-                tests.append("not_null")
-            if table["primary_key"] == [col["name"]]:
-                tests.append("unique")
-            if "allowed_values" in col:
-                tests.append({"accepted_values": {"arguments": {"values": col["allowed_values"]}}})
-            if col["name"] in fk_by_col:
-                ref = fk_by_col[col["name"]]
-                to = f"ref('{ref['table']}')"
-                tests.append(
-                    {"relationships": {"arguments": {"to": to, "field": ref["columns"][0]}}}
-                )
-            entry: dict[str, Any] = {"name": col["name"], "description": col["description"]}
-            if tests:
-                entry["data_tests"] = tests
-            cols.append(entry)
-        models.append({"name": table["name"], "description": table["description"], "columns": cols})
+    """dbt tests for the CRM staging models, derived from the contract (see contract_check)."""
+    models = [dbt_model_entry(t) for t in crm_tables(contract).values()]
     doc = {"version": 2, "models": models}
     return header(m, contract, "#") + "\n" + yaml.safe_dump(doc, sort_keys=False, width=100)
 

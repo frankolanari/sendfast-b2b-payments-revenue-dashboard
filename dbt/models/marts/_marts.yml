@@ -1,0 +1,141 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: Calendar, UTC, from the start of the simulated history to the as-of date.
+    columns:
+      - name: date_day
+        data_tests: [not_null, unique]
+
+  - name: dim_reps
+    description: Sales reps (CRM users).
+    columns:
+      - name: rep_id
+        data_tests: [not_null, unique]
+
+  - name: dim_accounts
+    description: One unified account (CRM accounts plus unmatched billing customers), with lifecycle and health.
+    columns:
+      - name: account_id
+        data_tests: [not_null, unique]
+      - name: match_method
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [explicit_id, domain, unmatched, crm_only] }
+      - name: exclusion_reason
+        data_tests:
+          - accepted_values:
+              arguments: { values: [test, internal] }
+      - name: churn_type
+        data_tests:
+          - accepted_values:
+              arguments: { values: [contract, silent] }
+      - name: health_status
+        data_tests:
+          - accepted_values:
+              arguments: { values: [healthy, watch, at_risk] }
+      - name: owner_id
+        data_tests:
+          - relationships:
+              arguments: { to: ref('dim_reps'), field: rep_id }
+
+  - name: fct_leads_funnel
+    columns:
+      - name: lead_id
+        data_tests: [not_null, unique]
+      - name: lead_source
+        data_tests:
+          - accepted_values:
+              arguments: { values: [inbound, outbound, paid, partner, unknown] }
+
+  - name: fct_opportunities
+    data_tests:
+      - expression_is_true:
+          arguments: { expression: "amount_usd is null or amount_usd >= 0" }
+      - expression_is_true:
+          arguments:
+            { expression: "sales_cycle_days is null or sales_cycle_days >= 0" }
+    columns:
+      - name: opportunity_id
+        data_tests: [not_null, unique]
+      - name: account_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: { to: ref('dim_accounts'), field: account_id }
+
+  - name: fct_stage_transitions
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            { combination_of_columns: [opportunity_id, stage_sequence] }
+
+  - name: fct_account_daily
+    description: Account x day x corridor x rail.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            {
+              combination_of_columns:
+                [account_id, activity_date, corridor, rail],
+            }
+      - expression_is_true:
+          arguments:
+            { expression: "volume_usd >= 0 and failed_count <= txn_count" }
+    columns:
+      - name: account_id
+        data_tests:
+          - relationships:
+              arguments: { to: ref('dim_accounts'), field: account_id }
+
+  - name: fct_revenue_monthly
+    description: Account x month net revenue in USD.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: { combination_of_columns: [account_id, revenue_month] }
+      - expression_is_true:
+          arguments:
+            {
+              expression: "platform_fee_usd >= 0 and usage_fee_usd >= 0 and fx_margin_usd >= 0 and true_up_usd >= 0",
+            }
+    columns:
+      - name: account_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: { to: ref('dim_accounts'), field: account_id }
+
+  - name: fct_revenue_bridge
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            {
+              combination_of_columns:
+                [revenue_month, category, segment, lead_source],
+            }
+    columns:
+      - name: category
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                { values: [new, expansion, contraction, churn, reactivation] }
+
+  - name: fct_cohort_retention
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            { combination_of_columns: [cohort_quarter, months_since_live] }
+      - expression_is_true:
+          arguments: { expression: "logo_retention between 0 and 1" }
+
+  - name: fct_account_health_monthly
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: { combination_of_columns: [account_id, month_start] }
+      - expression_is_true:
+          arguments:
+            {
+              expression: "(failure_rate is null or failure_rate between 0 and 1) and health_score between 0 and 100",
+            }

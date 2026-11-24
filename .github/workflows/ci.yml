@@ -84,6 +84,45 @@ jobs:
       - name: every planted story is detectable in the raw tables (full scale)
         run: make stories
 
+  integration:
+    needs: unit
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-alpine # same pin as docker-compose.yml; the image defaults to UTC
+        env:
+          POSTGRES_DB: sendfast
+          POSTGRES_USER: sendfast_admin
+          POSTGRES_PASSWORD: synthetic-local-only
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sendfast_admin -d sendfast"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGPASSWORD: synthetic-local-only # synthetic CI database only (D12)
+      PSQL: psql -h localhost -p 55432 -U sendfast_admin -d sendfast
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: cp .env.example .env
+      - name: generate synthetic data (scale 0.1)
+        run: make generate SCALE=0.1
+      - name: compile maps, apply roles, dbt build (all tests)
+        run: make transform CRM=hubspot
+      - name: dbt docs (lineage)
+        run: make dbt-docs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dbt-docs
+          path: |
+            dbt/target/index.html
+            dbt/target/manifest.json
+            dbt/target/catalog.json
+
   compiled-up-to-date:
     needs: unit
     runs-on: ubuntu-latest

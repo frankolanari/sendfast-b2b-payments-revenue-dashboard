@@ -14,6 +14,7 @@ WAIT_TIMEOUT ?= 300
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
+        db-roles dbt-docs gate-4 \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -71,6 +72,18 @@ profile-charts: ## Gate 3 sign-off charts -> docs/evidence/gate-3/
 generate-timed: env ## Full-scale generate + load must finish in under 5 minutes
 	$(GEN) generate --scale 1.0 --max-seconds 300
 
+# ── Transformations (Stage 4) ────────────────────────────────────────────
+# psql runs inside the local data container; CI sets PSQL to a host psql client instead.
+PSQL ?= docker compose exec -T postgres-data psql -U $(DATA_DB_ADMIN_USER) -d $(DATA_DB_NAME)
+
+db-roles: env ## Create/refresh the transformer, bi_reader and conformance roles and grants
+	@$(PSQL) -q -v ON_ERROR_STOP=1 -v transformer_password='$(TRANSFORMER_PASSWORD)' \
+	  -v bi_reader_password='$(BI_READER_PASSWORD)' -v conformance_password='$(CONFORMANCE_PASSWORD)' \
+	  -f - < deploy/sql/roles.sql
+
+dbt-docs: ## Generate dbt docs (lineage graph) into dbt/target
+	$(DBT) docs generate $(DBT_DIRS)
+
 # ── CRM mapping layer (Stage 2) ──────────────────────────────────────────
 CRM ?= hubspot
 DBT := uv run dbt --no-use-colors
@@ -92,8 +105,8 @@ generate: env ## Generate seeded synthetic data and load the raw schemas (SCALE=
 	$(GEN) generate --scale $(SCALE)
 compile-maps: ## CRM YAML map -> dbt staging models (CRM=hubspot by default)
 	uv run python scripts/compile_mappings.py compile --crm $(CRM)
-transform: ## dbt build (Stage 4)
-	@echo "Not built yet: Stage 4." && exit 1
+transform: env compile-maps db-roles ## dbt build: staging -> intermediate -> marts, all tests (CRM=hubspot)
+	$(DBT) build $(DBT_DIRS)
 metabase-bootstrap: ## Rebuild Metabase content from the repo (Stage 6)
 	@echo "Not built yet: Stage 6." && exit 1
 golden: ## Golden-number check (Stage 5)
@@ -119,4 +132,7 @@ gate-2: gate-1 compiled-check compile-idempotent dbt-parse ## G2: maps compile, 
 gate-3: gate-2 answer-keys-check stories generate-timed ## G3: invariants, determinism, stories, <5 min (+ G0-2)
 	@echo "Gate 3 passed."
 
-gates: gate-3 ## Run every gate built so far
+gate-4: gate-3 transform ## G4: dbt build with zero test failures, identity match >= 95% (+ G0-3)
+	@echo "Gate 4 passed."
+
+gates: gate-4 ## Run every gate built so far

@@ -1,0 +1,25 @@
+# Upstream landed data (out of scope to build; PLAN.md D4). CRM sources are generated per map.
+version: 2
+
+sources:
+  - name: billing
+    description: Stripe-shaped billing data landed by the upstream Stripe -> Postgres pipeline.
+    schema: billing
+    tables:
+      - name: customers
+      - name: subscriptions
+      - name: invoices
+      - name: invoice_lines
+  - name: ledger
+    description: The payments platform's own database.
+    schema: ledger
+    tables:
+      - name: merchants
+      - name: transactions
+      - name: disputes
+  - name: rates
+    description: FX rates and per-customer pricing with effective dates.
+    schema: rates
+    tables:
+      - name: fx_rates
+      - name: pricing_rates

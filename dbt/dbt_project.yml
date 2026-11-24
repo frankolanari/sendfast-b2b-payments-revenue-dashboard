@@ -10,6 +10,16 @@ test-paths: ["tests"]
 target-path: target
 clean-targets: [target, dbt_packages]
 
+vars:
+  as_of_date: "2026-10-31" # fixed (D11); never now()
+  window_start: "2024-11-01" # first day of the 24-month data window
+  history_start: "2023-11-01" # CRM history reaches back further than the window
+  internal_domains: ["sendfast.example"] # cleaning: SendFast's own accounts
+  silent_churn_days: 60
+  at_risk_volume_drop: 0.5
+  at_risk_failure_rate: 0.10
+  at_risk_min_transactions: 20
+
 models:
   sendfast:
     staging:

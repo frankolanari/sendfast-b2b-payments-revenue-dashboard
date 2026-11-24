@@ -10,6 +10,8 @@ exclude_rules = ST06
 
 [sqlfluff:templater:jinja]
 apply_dbt_builtins = True
+# the project's own macros (as_of_date, utc_date, ...), so models render for linting
+load_macros_from_path = dbt/macros
 
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = lower
