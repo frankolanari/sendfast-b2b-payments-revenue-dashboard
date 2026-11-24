@@ -1,0 +1,36 @@
+# Page 1 (D10): pipeline and funnel. The rep deep dive is the Rep filter on this page.
+# Layout: Metabase's 24-column grid. crossfilter: {dashboard filter: clicked column}.
+name: Pipeline & funnel
+collection: Pipeline
+description: Pipeline created, win rate, sales cycle and open pipeline, by lead source and rep.
+parameters: [date_from, date_to, segment, lead_source, owner_id]
+cards:
+  - { card: Pipeline created (USD), row: 0, col: 0, size_x: 6, size_y: 3 }
+  - { card: Win rate, row: 0, col: 6, size_x: 6, size_y: 3 }
+  - { card: Sales cycle (median days), row: 0, col: 12, size_x: 6, size_y: 3 }
+  - { card: Open pipeline (USD), row: 0, col: 18, size_x: 6, size_y: 3 }
+  - card: Pipeline created by month and lead source
+    row: 3
+    col: 0
+    size_x: 24
+    size_y: 6
+    crossfilter: { lead_source: lead_source }
+  - card: Win rate by lead source
+    row: 9
+    col: 0
+    size_x: 12
+    size_y: 6
+    crossfilter: { lead_source: lead_source }
+  - card: Lead conversion by lead source
+    row: 9
+    col: 12
+    size_x: 12
+    size_y: 6
+    crossfilter: { lead_source: lead_source }
+  - card: Open pipeline by rep
+    row: 15
+    col: 0
+    size_x: 14
+    size_y: 7
+    crossfilter: { owner_id: owner_id }
+  - { card: Median days in stage, row: 15, col: 14, size_x: 10, size_y: 7 }

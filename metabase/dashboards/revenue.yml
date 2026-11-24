@@ -1,0 +1,47 @@
+# Page 2 (D10): revenue and retention, including activation.
+name: Revenue & retention
+collection: Revenue
+description: Net revenue, volume, take rate, retention and activation.
+parameters: [date_from, date_to, segment, lead_source]
+cards:
+  - { card: Net revenue (USD), row: 0, col: 0, size_x: 6, size_y: 3 }
+  - { card: Total payment volume (USD), row: 0, col: 6, size_x: 6, size_y: 3 }
+  - { card: Take rate, row: 0, col: 12, size_x: 6, size_y: 3 }
+  - { card: Platform MRR (USD), row: 0, col: 18, size_x: 6, size_y: 3 }
+  - { card: Net revenue retention (NRR), row: 3, col: 0, size_x: 8, size_y: 3 }
+  - {
+      card: Gross revenue retention (GRR),
+      row: 3,
+      col: 8,
+      size_x: 8,
+      size_y: 3,
+    }
+  - { card: Activation (median days), row: 3, col: 16, size_x: 8, size_y: 3 }
+  - {
+      card: Net revenue by month and component,
+      row: 6,
+      col: 0,
+      size_x: 24,
+      size_y: 6,
+    }
+  - { card: Revenue bridge by month, row: 12, col: 0, size_x: 24, size_y: 6 }
+  - {
+      card: Logo retention by go-live cohort,
+      row: 18,
+      col: 0,
+      size_x: 14,
+      size_y: 7,
+    }
+  - {
+      card: Churn rate by activation speed,
+      row: 18,
+      col: 14,
+      size_x: 10,
+      size_y: 7,
+    }
+  - card: 12-month net revenue per account by lead source
+    row: 25
+    col: 0
+    size_x: 24
+    size_y: 6
+    crossfilter: { lead_source: lead_source }

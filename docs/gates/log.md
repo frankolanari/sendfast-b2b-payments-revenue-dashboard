@@ -2,13 +2,14 @@
 
 One line per gate pass (PLAN.md Section 4A). Approved exceptions are listed with their reason.
 
-| Gate | Date       | Commit    | Exceptions                                                         |
-| ---- | ---------- | --------- | ------------------------------------------------------------------ |
-| G0   | 2026-11-23 | `88a4465` | none                                                               |
-| G1   | 2026-11-23 | `41231ce` | none                                                               |
-| G2   | 2026-11-23 | `b4fa09d` | none                                                               |
-| G3   | 2026-11-24 | `4afeb25` | none (test change withdrawn, see below)                            |
-| G4   | 2026-11-24 | `e6b3787` | contract 2.0.0; three version-relative tests (approved, see below) |
+| Gate | Date       | Commit    | Exceptions                                                               |
+| ---- | ---------- | --------- | ------------------------------------------------------------------------ |
+| G0   | 2026-11-23 | `88a4465` | none                                                                     |
+| G1   | 2026-11-23 | `41231ce` | none                                                                     |
+| G2   | 2026-11-23 | `b4fa09d` | none                                                                     |
+| G3   | 2026-11-24 | `4afeb25` | none (test change withdrawn, see below)                                  |
+| G4   | 2026-11-24 | `e6b3787` | contract 2.0.0; three version-relative tests (approved, see below)       |
+| G5   | 2026-11-24 | `8526e8f` | answer key: activation and lead-source definitions (approved, see below) |
 
 ## Exceptions
 

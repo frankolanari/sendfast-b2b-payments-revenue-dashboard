@@ -255,6 +255,36 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: when a golden metric is off by a few entities, re-run the truth under each candidate definition before touching SQL; a small CI scale can miss a cohort-level bug, so the full-scale local gate is the real one. Specific: unmatched billing customers and CRM-only fields.
 **Tags:** #linkedin #x #article #book #skill
 
+## 2026-11-24 · Stage 5 · Gate 5 passed in CI and merged
+**Type:** gate-pass
+**What happened:** All 7 CI checks green on PR #7. The integration job's new golden step printed 19/19 against the scale 0.1 key (checked in the job log, not assumed from the green tick). Merged to `main` and tagged `gate-5` on `8526e8f`, after checking that the merged commit carries `metrics/metrics.yml` and `scripts/golden_check.py`.
+**Follow-up decision:** the owner asked whether the 7 unmatched customers should get matching CRM records instead. Answer: no. They are already handled (revenue fully counted; excluded or `unknown` only where CRM data is needed), and an imperfect match rate is a deliberate test of the dashboard against an untidy CRM. The owner agreed to leave them.
+**Evidence:** PR #7, tag `gate-5` on `8526e8f`, `docs/gates/log.md`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 6 · Metabase rebuilt from the repo in 23 seconds, and three-way golden numbers
+**Type:** milestone
+**What happened:** `scripts/metabase_bootstrap.py` builds the whole Metabase layer from the repo on an empty app DB: first-run setup with the setup token, report time zone UTC, the data DB as `bi_reader` (analytics schema only), 7 collections, a view-only group and its API key for the proxy (written to the gitignored `.env.metabase`), 38 native SQL cards from `metabase/cards/*.sql`, 19 golden cards generated from `metrics/metrics.yml`, 4 models, 3 measures, and the 4 D10 dashboards from `metabase/dashboards/*.yml` with cross-filters and drill links to Account 360. It then runs every dashboard card with its default filters, and proves the proxy key is view-only: it runs a saved card, and ad-hoc SQL and card creation are refused (403). `metabase/parameters.yml` is the shared parameter contract: every card and filter uses those 7 names and types, and the bootstrap refuses anything else. `golden_check.py --metabase` adds the third source: each metric's golden card, and for 13 metrics the actual dashboard card a user sees (run with the golden filters through the proxy key), must agree with the key and the marts. `metabase` CI job runs the same compose stack.
+**Why it matters:** Nothing in Metabase is hand-made, so the cloud move (Stage 10) is the same command against another URL. And the number on the dashboard tile is checked, not just the number in the warehouse.
+**Options considered / pushback:** Card SQL may only filter and aggregate mart columns (rule 4). Two rules that would have lived in card SQL moved into `dim_accounts` instead: `activation_speed` (dbt var `activation_slow_days: 45`) and `net_revenue_first_12m_usd`. The new column reproduces the lead-source answer key to the cent. The PLAN's `[verify]` on the setup API was checked against the pinned instance's own OpenAPI spec (`/api/docs/openapi.json`), not memory: `/api/setup` still takes a setup token; v0.64 adds first-class measures (`/api/measure`). The optional SDK spike was skipped (it never changes D1).
+**Numbers:** fresh bootstrap 23 s at full scale (limit 180 s); a rerun: 81 objects unchanged, 0 changes; 35 dashboard cards run clean; three-way golden 19/19 at scale 1.0 and 0.1; 134 unit tests.
+**Quotable line:** "The number on the dashboard tile is tested against the answer key, not just the number in the warehouse."
+**Generic vs specific (#skill):** generic: content as code (cards with front matter, dashboards as YAML), a parameter contract enforced at build time, upsert by name with format-neutral comparison so reruns are no-ops, generated golden cards, proxy key proven view-only by trying to misuse it, smoke-run every dashboard card. Specific: the 38 payments cards and four pages.
+**Tags:** #linkedin #article #case-study #video #skill
+
+## 2026-11-24 · Stage 6 · What broke on the way (and one bug only a screenshot found)
+**Type:** problem-fix
+**What happened:** (1) v0.64 stores native queries in MBQL 5 (stages, template tags as a list), so comparing what was posted with what was read back made every rerun an "update"; the bootstrap now posts MBQL 5 and compares a format-neutral fingerprint. (2) Data permissions "changed" on every run: Metabase stores `create-queries: no` by leaving the key out. (3) `MB_ADMIN_EMAIL` is a real Metabase setting name, so the bootstrap's variables became `MB_BOOTSTRAP_*`. (4) A measure update needs a `revision_message`. (5) The first full `make gate-6` failed at the last step with 401: make reads `.env.metabase` once at start, so after `metabase-reset` minted a new key the three-way check still held the old one. The check now reads the file the bootstrap just wrote. Whole gate rerun after the fix. (6) While taking the sign-off screenshots, Account 360 showed 275 activation days for the largest customer: it went live in February 2024, but the ledger starts 2024-11-01, so its "first payment" was clipped to the window start. Every account live before the window had a made-up activation time and `activation_speed`. No test caught it, because the golden metric and the churn-by-speed card already limit to accounts inside the window. Fixed in `int_account_lifecycle`: activation is unknown when go-live is before the window.
+**Why it matters:** (6) is the case for human sign-offs. 197 dbt tests and a three-way golden check were green while a profile card showed a number nobody should trust.
+**Quotable line:** "All checks green, and the first screenshot still found a wrong number."
+**Generic vs specific (#skill):** generic: any metric measured from a first event is censored at the data window's start; null it for entities that began before the window. Make includes are read once per invocation. Specific: Metabase v0.64 API shapes.
+**Tags:** #linkedin #x #article #book #skill
+
+## 2026-11-24 · Stage 6 · Owner sign-off: cross-filtering screenshots
+**Type:** decision
+**What happened:** Gate 6 needs the owner to confirm cross-filtering on the native dashboards. Evidence is in `docs/evidence/gate-6/` (6 screenshots and a README): clicking a lead source bar filters Pipeline & funnel; clicking the USD-NGN spike filters Account health & risk to that corridor; clicking the top account opens Account 360 for it. Under the owner's standing rule, the agent saved the evidence and carried on; the owner can object afterwards.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -294,4 +324,5 @@ _(Your own words, any time. Rough is fine.)_
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
-| 5 Golden numbers | 2026-11-24 | pending CI | 1 | 17/19 then 19/19 after the owner-approved key change |
+| 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
+| 6 Metabase | 2026-11-24 | pending CI | 2 | stale API key within one make run; activation clipped by the window |

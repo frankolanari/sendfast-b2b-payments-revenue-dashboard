@@ -1,13 +1,15 @@
-"""Golden-number check, stage 1 of 2 (PLAN.md Stage 5): the answer key against the marts.
+"""Golden-number check (PLAN.md Stages 5 and 6): answer key vs marts vs Metabase.
 
-Every metric in metrics/metrics.yml runs its golden query against the analytics marts, as the
-bi_reader role (what BI sees), and is compared with generator/answer_keys/scale_<scale>.json.
-A mismatch prints the metric, expected, actual, tolerance and the exact SQL run.
-Stage 6 adds Metabase as the third source.
+Stage 1: every metric in metrics/metrics.yml runs its golden query against the analytics marts,
+as the bi_reader role (what BI sees), and is compared with generator/answer_keys/scale_<s>.json.
+Stage 2 (--metabase): three-way agreement. Through the proxy's view-only API key, each metric's
+generated golden card must match both the key and the marts, and where golden.card names a
+dashboard card, that card (run with the listed filters) must match the key too.
+A mismatch prints the metric, the source, expected, actual, tolerance and the SQL used.
 
 Output is aggregates only (rule 8): metric values and counts, never rows.
 
-    uv run python scripts/golden_check.py --scale 1.0
+    uv run python scripts/golden_check.py --scale 1.0 [--metabase]
 """
 
 from __future__ import annotations
@@ -35,6 +37,9 @@ class Result:
     sql: str = ""
     problems: list[str] = field(default_factory=list)
     actual: Any = None
+    columns: list[str] = field(default_factory=list)
+    rows: list[tuple] = field(default_factory=list)
+    checks: list[str] = field(default_factory=list)  # sources that agreed, for the report
 
     @property
     def ok(self) -> bool:
@@ -78,6 +83,15 @@ def validate_spec(spec: dict[str, Any], key: dict[str, Any]) -> list[str]:
         golden = m.get("golden") or {}
         if not golden.get("query"):
             problems.append(f"{name}: golden.query is missing")
+        card = golden.get("card")
+        if card is not None:
+            if not card.get("name") or not card.get("column"):
+                problems.append(f"{name}: golden.card needs name and column")
+            for pname, period in (card.get("parameters") or {}).items():
+                if period not in (spec.get("periods") or {}):
+                    problems.append(
+                        f"{name}: golden.card.parameters.{pname} {period!r} is not a period"
+                    )
         tol = golden.get("tolerance")
         if not isinstance(tol, (int, float)) or isinstance(tol, bool) or tol < 0:
             problems.append(f"{name}: golden.tolerance must be a number >= 0")
@@ -186,17 +200,97 @@ def run(spec: dict[str, Any], key: dict[str, Any], conn) -> list[Result]:
             cur.execute(golden["query"], params)
             columns = [d.name for d in cur.description]
             rows = cur.fetchall()
+            res.columns, res.rows = columns, [tuple(r) for r in rows]
+            res.checks.append("marts")
             res.actual = rows[0][columns.index("value")] if len(rows) == 1 else len(rows)
             res.problems = compare(m["name"], key["metrics"][m["name"]], columns, rows, golden)
             results.append(res)
     return results
 
 
+# ── Stage 2: Metabase ────────────────────────────────────────────────────
+def rows_as_entry(columns: list[str], rows: list[tuple], by: str | None) -> dict[str, Any]:
+    """Query rows in the answer key's shape, so one source can be compared with another."""
+    if by is None:
+        return dict(zip(columns, rows[0], strict=True)) if len(rows) == 1 else {}
+    idx = columns.index(by)
+    return {c: {r[idx]: r[i] for r in rows} for i, c in enumerate(columns) if c != by}
+
+
+def card_parameters(card_ref: dict[str, Any], periods: dict[str, Any], contract: dict) -> list:
+    out = []
+    for pname, period in (card_ref.get("parameters") or {}).items():
+        kind = "date/single" if contract[pname]["type"] == "date" else "string/="
+        out.append(
+            {
+                "id": pname,
+                "type": kind,
+                "target": ["variable", ["template-tag", pname]],
+                "value": str(periods[period]),
+            }
+        )
+    return out
+
+
+def run_metabase(spec, key, results: list[Result], mb, golden_prefix: str, contract) -> None:
+    """Add Metabase's answers to each result: the golden card and, if named, the dashboard card."""
+    cards = {c["name"]: c["id"] for c in mb.get("/api/card?f=all") if not c.get("archived")}
+    for m, res in zip(spec["metrics"], results, strict=True):
+        golden = m["golden"]
+        entry = key["metrics"][m["name"]]
+        gname = golden_prefix + m["name"]
+        if gname not in cards:
+            res.problems.append(f"Metabase: no card {gname!r} (run make metabase-bootstrap)")
+            continue
+        out = mb.post(f"/api/card/{cards[gname]}/query", {"parameters": []})
+        if out.get("status") != "completed":
+            res.problems.append(f"Metabase {gname!r}: {str(out.get('error'))[:200]}")
+            continue
+        columns = [c["name"] for c in out["data"]["cols"]]
+        rows = [tuple(r) for r in out["data"]["rows"]]
+        res.problems += [
+            f"Metabase vs key: {p}" for p in compare(m["name"], entry, columns, rows, golden)
+        ]
+        marts = rows_as_entry(res.columns, res.rows, golden.get("by"))
+        if marts:
+            vs_marts = compare(m["name"], marts, columns, rows, golden)
+            res.problems += [f"Metabase vs marts: {p}" for p in vs_marts]
+        res.checks.append("golden card")
+
+        ref = golden.get("card")
+        if not ref:
+            continue
+        if ref["name"] not in cards:
+            res.problems.append(f"Metabase: no dashboard card {ref['name']!r}")
+            continue
+        params = card_parameters(ref, spec["periods"], contract)
+        out = mb.post(f"/api/card/{cards[ref['name']]}/query", {"parameters": params})
+        if out.get("status") != "completed":
+            res.problems.append(f"Metabase {ref['name']!r}: {str(out.get('error'))[:200]}")
+            continue
+        names = [c["name"] for c in out["data"]["cols"]]
+        rows = out["data"]["rows"]
+        if len(rows) != 1 or ref["column"] not in names:
+            res.problems.append(
+                f"dashboard card {ref['name']!r}: expected one row with {ref['column']!r}"
+            )
+            continue
+        actual = rows[0][names.index(ref["column"])]
+        tol = float(golden["tolerance"])
+        if not _close(actual, entry["value"], tol):
+            res.problems.append(
+                f"dashboard card {ref['name']!r}: "
+                + _mismatch("value", entry["value"], actual, tol)
+            )
+        res.checks.append(f"card {ref['name']!r}")
+
+
 def report(results: list[Result]) -> str:
     lines = []
     for r in results:
         if r.ok:
-            lines.append(f"PASS  {r.name}")
+            agreed = f"  ({' = '.join(['key', *r.checks])})" if len(r.checks) > 1 else ""
+            lines.append(f"PASS  {r.name}{agreed}")
             continue
         lines.append(f"FAIL  {r.name}")
         lines += [f"        {p}" for p in r.problems]
@@ -211,6 +305,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scale", type=float, default=1.0, help="which answer key (1.0 or 0.1)")
     ap.add_argument("--metrics", type=Path, default=METRICS_PATH)
+    ap.add_argument(
+        "--metabase", action="store_true", help="three-way: also check Metabase (Stage 6)"
+    )
     args = ap.parse_args(argv)
 
     key_path = answer_key_path(args.scale)
@@ -230,6 +327,18 @@ def main(argv: list[str] | None = None) -> int:
         results = run(spec, key, conn)
     finally:
         conn.close()
+    if args.metabase:
+        import metabase_content as mc
+        from metabase_bootstrap import Client, read_key_file
+
+        # The file the bootstrap just wrote beats the env: make reads .env.metabase once, at
+        # start, so within `make gate-6` the env still holds the key from before the reset.
+        api_key = read_key_file() or os.environ.get("MB_API_KEY")
+        if not api_key:
+            print("MB_API_KEY is not set: run make metabase-bootstrap (writes .env.metabase)")
+            return 1
+        mb = Client(os.environ["MB_SITE_URL"], api_key=api_key)  # the proxy's view-only key
+        run_metabase(spec, key, results, mb, mc.GOLDEN_PREFIX, mc.load_parameters())
     print(report(results))
     return 0 if all(r.ok for r in results) else 1
 

@@ -36,6 +36,23 @@ health_now as (
 
 ),
 
+-- Net revenue in the first 12 calendar months from the go-live month, for accounts that went
+-- live inside the data window early enough to have had all 12 months by the as-of month.
+first_year_revenue as (
+
+    select
+        revenue.account_id,
+        sum(revenue.net_revenue_usd) as net_revenue_first_12m_usd
+    from {{ ref('fct_revenue_monthly') }} as revenue
+    inner join {{ ref('int_account_lifecycle') }} as lifecycle
+        on revenue.billing_customer_id = lifecycle.billing_customer_id
+    where
+        revenue.revenue_month >= {{ month_of('lifecycle.live_date') }}
+        and revenue.revenue_month < {{ month_of('lifecycle.live_date') }} + interval '12 months'
+    group by revenue.account_id
+
+),
+
 first_won_source as (
 
     select distinct on (account_id)
@@ -146,7 +163,20 @@ select
     unified.contract_end_date,
     unified.churn_type,
     unified.churn_date,
+    case
+        when unified.activation_days is null then null
+        when unified.activation_days <= {{ var("activation_slow_days") }} then 'fast'
+        else 'slow'
+    end as activation_speed,
+    case
+        when
+            unified.live_date >= {{ window_start() }}
+            and unified.live_date < {{ month_of(as_of_date()) }} - interval '11 months'
+            then coalesce(first_year_revenue.net_revenue_first_12m_usd, 0)
+    end as net_revenue_first_12m_usd,
     health_now.health_status
 from unified
 left join health_now
     on unified.account_id = health_now.account_id
+left join first_year_revenue
+    on unified.account_id = first_year_revenue.account_id

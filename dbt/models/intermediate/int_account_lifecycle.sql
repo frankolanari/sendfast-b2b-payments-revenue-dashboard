@@ -107,7 +107,9 @@ select
     to_char(live_date, 'YYYY"Q"Q') as cohort_quarter,
     first_succeeded_date,
     last_succeeded_date,
-    first_succeeded_date - won_date as activation_days,
+    -- Unknown when go-live is before the data window: the ledger starts at the window, so the
+    -- first payment we can see is not the account's first payment.
+    case when live_date >= {{ window_start() }} then first_succeeded_date - won_date end as activation_days,
     contract_end_date,
     case
         when contract_end_date is not null then 'contract'

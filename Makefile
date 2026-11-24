@@ -8,13 +8,14 @@ COMPOSE := docker compose
 
 # Local settings (.env) reach every recipe: the DB loader reads them. Synthetic values only.
 -include .env
+-include .env.metabase # the proxy's API key, written by metabase-bootstrap
 export
 WAIT_TIMEOUT ?= 300
 
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
-        db-roles dbt-docs gate-4 gate-5 \
+        db-roles dbt-docs gate-4 gate-5 gate-6 metabase-reset metabase-rerun golden-3way \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -107,10 +108,25 @@ compile-maps: ## CRM YAML map -> dbt staging models (CRM=hubspot by default)
 	uv run python scripts/compile_mappings.py compile --crm $(CRM)
 transform: env compile-maps db-roles ## dbt build: staging -> intermediate -> marts, all tests (CRM=hubspot)
 	$(DBT) build $(DBT_DIRS)
-metabase-bootstrap: ## Rebuild Metabase content from the repo (Stage 6)
-	@echo "Not built yet: Stage 6." && exit 1
+# ── Metabase layer (Stage 6) ─────────────────────────────────────────────
+# The app DB holds only what the bootstrap rebuilds from the repo, so it is safe to wipe.
+MB_APP_PSQL ?= $(COMPOSE) exec -T postgres-metabase psql -q -v ON_ERROR_STOP=1 -U $(MB_APP_DB_USER) -d postgres
+
+metabase-reset: env ## Empty Metabase app DB, restart Metabase, wait until healthy (local stack only)
+	$(COMPOSE) stop metabase
+	$(MB_APP_PSQL) -c 'drop database if exists "$(MB_APP_DB_NAME)" with (force)' -c 'create database "$(MB_APP_DB_NAME)"'
+	$(COMPOSE) up -d --wait --wait-timeout $(WAIT_TIMEOUT) metabase
+	rm -f .env.metabase
+
+metabase-bootstrap: env ## Rebuild Metabase from the repo: setup, DB, collections, cards, models, measures, dashboards
+	uv run python scripts/metabase_bootstrap.py --max-seconds 180
+
+metabase-rerun: env ## Bootstrap again: must change nothing (idempotent)
+	uv run python scripts/metabase_bootstrap.py --max-seconds 180 --expect-no-changes
 golden: env ## Golden numbers: answer key vs marts, as bi_reader (SCALE must match the loaded data)
 	uv run python scripts/golden_check.py --scale $(SCALE)
+golden-3way: env ## Three-way golden check: answer key vs marts vs Metabase cards (Stage 6)
+	uv run python scripts/golden_check.py --scale $(SCALE) --metabase
 conformance: ## Aggregate-only conformance checks (Stage 8)
 	@echo "Not built yet: Stage 8." && exit 1
 web: ## React front end dev server (Stage 7)
@@ -138,4 +154,7 @@ gate-4: gate-3 transform ## G4: dbt build with zero test failures, identity matc
 gate-5: gate-4 golden ## G5: every metric in metrics.yml matches the answer key (+ G0-4)
 	@echo "Gate 5 passed."
 
-gates: gate-5 ## Run every gate built so far
+gate-6: gate-5 metabase-reset metabase-bootstrap metabase-rerun golden-3way ## G6: bootstrap from empty < 3 min, rerun changes nothing, three-way golden (+ G0-5)
+	@echo "Gate 6 passed (automated part). Owner sign-off: cross-filtering screenshots in docs/evidence/gate-6/."
+
+gates: gate-6 ## Run every gate built so far

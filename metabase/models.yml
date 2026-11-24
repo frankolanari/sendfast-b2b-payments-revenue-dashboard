@@ -1,0 +1,29 @@
+# Metabase models on the key marts, and simple additive measures (D7: anything more than a
+# sum or a count belongs in a mart). Created by scripts/metabase_bootstrap.py, upserted by name.
+models:
+  - name: Accounts
+    table: dim_accounts
+    description: One row per account (CRM accounts plus unmatched billing customers), with lifecycle and health.
+  - name: Opportunities
+    table: fct_opportunities
+    description: One row per opportunity, current state. Test and internal accounts excluded.
+  - name: Revenue by account and month
+    table: fct_revenue_monthly
+    description: Net revenue in USD by account and month, split into its four components.
+  - name: Account daily activity
+    table: fct_account_daily
+    description: Volume, counts, failures, fees, disputes and returns by account, day, corridor and rail.
+
+measures:
+  - name: Total payment volume (USD)
+    table: fct_account_daily
+    aggregation: { sum: volume_usd }
+    description: Sum of succeeded transaction volume in USD.
+  - name: Net revenue (USD)
+    table: fct_revenue_monthly
+    aggregation: { sum: net_revenue_usd }
+    description: Platform fee + usage fee + FX margin + true-up.
+  - name: Deals won
+    table: fct_opportunities
+    aggregation: { count_where: is_won }
+    description: Number of won opportunities.
