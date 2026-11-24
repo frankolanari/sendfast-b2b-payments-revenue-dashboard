@@ -39,6 +39,13 @@ models:
         data_tests:
           - relationships:
               arguments: { to: ref('dim_reps'), field: rep_id }
+      - name: activation_speed
+        description: fast if activation_days <= var activation_slow_days, else slow; null if never transacted.
+        data_tests:
+          - accepted_values:
+              arguments: { values: [fast, slow] }
+      - name: net_revenue_first_12m_usd
+        description: Net revenue in the first 12 calendar months from go-live; null unless all 12 are in the window.
 
   - name: fct_leads_funnel
     columns:

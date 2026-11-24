@@ -125,6 +125,33 @@ jobs:
             dbt/target/manifest.json
             dbt/target/catalog.json
 
+  metabase:
+    needs: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: cp .env.example .env
+      - name: start the stack (data Postgres, Metabase app DB, pinned Metabase; up to 5 min)
+        run: make up
+      - name: generate synthetic data (scale 0.1)
+        run: make generate SCALE=0.1
+      - name: compile maps, apply roles, dbt build (all tests)
+        run: make transform CRM=hubspot
+      - name: bootstrap Metabase from an empty app DB (under 3 minutes)
+        run: make metabase-bootstrap
+      - name: a second bootstrap changes nothing
+        run: make metabase-rerun
+      - name: three-way golden check (answer key vs marts vs Metabase, scale 0.1 key)
+        run: make golden-3way SCALE=0.1
+      - name: stop the stack
+        if: always()
+        run: make down
+
   compiled-up-to-date:
     needs: unit
     runs-on: ubuntu-latest

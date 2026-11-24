@@ -19,6 +19,7 @@ vars:
   at_risk_volume_drop: 0.5
   at_risk_failure_rate: 0.10
   at_risk_min_transactions: 20
+  activation_slow_days: 45 # slower than this from won to first payment = slow (Stage 3 story)
 
 models:
   sendfast:

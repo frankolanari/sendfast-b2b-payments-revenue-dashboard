@@ -54,6 +54,7 @@ services:
       MB_SITE_URL: ${MB_SITE_URL:?set in .env}
       MB_ANON_TRACKING_ENABLED: "false"
       MB_CHECK_FOR_UPDATES: "false"
+      MB_LOAD_SAMPLE_CONTENT: "false" # no sample database or example collection
       JAVA_TIMEZONE: UTC # UTC everywhere; the report timezone is set to UTC by the bootstrap (Stage 6)
     ports:
       - "${MB_HOST_PORT:-3000}:3000"
