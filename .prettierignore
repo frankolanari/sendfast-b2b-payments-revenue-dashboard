@@ -12,3 +12,4 @@ contract/data_dictionary.md
 # Compiler-owned output (scripts/compile_mappings.py)
 dbt/models/staging/crm/
 generator/answer_keys/
+dbt/models/staging/_stg_contract__models.yml

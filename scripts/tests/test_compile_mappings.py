@@ -128,7 +128,10 @@ def test_rejects_unknown_entity_key(hubspot, contract):
 
 
 def test_rejects_newer_or_other_major_contract_version(hubspot, contract):
-    hubspot["contract_version"] = "2.0.0"
+    major = int(contract["contract_version"].split(".")[0])
+    hubspot["contract_version"] = f"{major + 1}.0.0"  # newer than the contract
+    assert "contract_version" in errors_for(hubspot, contract)
+    hubspot["contract_version"] = f"{major - 1}.0.0" if major > 1 else "0.9.0"  # other major
     assert "contract_version" in errors_for(hubspot, contract)
 
 

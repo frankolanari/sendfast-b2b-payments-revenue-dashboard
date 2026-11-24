@@ -476,7 +476,11 @@ def rates(w: World) -> list[RawTable]:
         "rates",
         "pricing_rates",
         [
-            ("account_ref", "text", _s(pr["account_id"])),
+            (
+                "billing_customer_id",
+                "text",
+                _s(stable_id("cus_", int(a)) for a in pr["account_id"]),
+            ),
             ("fee_bps", "numeric", _s(pr["fee_bps"], lambda v: f"{float(v):.2f}")),
             ("fx_margin_bps", "numeric", _s(pr["fx_margin_bps"], lambda v: f"{float(v):.2f}")),
             (

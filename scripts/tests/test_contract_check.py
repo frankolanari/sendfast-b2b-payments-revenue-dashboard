@@ -135,13 +135,15 @@ def test_change_without_bump_is_rejected(contract):
 def test_change_with_bump_is_accepted(contract):
     base = copy.deepcopy(contract)
     column(contract, "stg_crm__users", "name")["nullable"] = True
-    contract["contract_version"] = "1.1.0"
+    major, minor, _ = cc.parse_version(base["contract_version"])
+    contract["contract_version"] = f"{major}.{minor + 1}.0"  # a minor bump of the base
     assert cc.version_bump_errors(contract, base) == []
 
 
 def test_version_going_backwards_is_rejected(contract):
     base = copy.deepcopy(contract)
-    base["contract_version"] = "2.0.0"
+    major, _, _ = cc.parse_version(contract["contract_version"])
+    base["contract_version"] = f"{major + 1}.0.0"  # base ahead of the current contract
     assert any("backwards" in e for e in cc.version_bump_errors(contract, base))
 
 

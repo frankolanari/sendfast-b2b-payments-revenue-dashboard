@@ -212,6 +212,23 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Quotable line:** "Pick one time zone. Then pick UTC."
 **Tags:** #linkedin #x #skill
 
+## 2026-11-24 · Stage 4 · Pricing keyed by the billing customer (contract 2.0.0), pending owner review
+**Type:** decision
+**What happened:** The contract keyed per-account pricing by CRM account. About 2% of customers can't be matched from CRM to billing (no Stripe id on the CRM record, no domain), so their pricing, and so their usage and FX-margin revenue, could never be found. The agent asked the owner which key to use; the owner declined the question and said to resume. The agent went ahead with its recommended option and flags it here for the owner to confirm or reverse: pricing lives with billing, keyed by the Stripe customer id. That is a breaking contract change (2.0.0, changelog entry, HubSpot map bumped).
+**Why it matters:** Revenue must not depend on whether the CRM is tidy. Billing knows who pays and at what price; the CRM only adds context.
+**Options considered / pushback:** Keep the CRM key and treat unmatched customers' usage revenue as unknowable (understates revenue by the unmatched share and blames the dashboard for a data-entry gap).
+**Tags:** #case-study #skill
+
+## 2026-11-24 · Stage 4 · Transformations: 196 dbt nodes green, and the marts already agree with the answer key
+**Type:** milestone
+**What happened:** Hand-written staging for billing, ledger and rates (minor units to major by currency exponent, Unix time to UTC, `ngn`/`₦` to NGN, website to domain); intermediate identity map (explicit Stripe id, then unique domain, else unmatched; test, internal and orphan exclusions), stage transitions, transactions enriched with USD at the day's FX rate and the pricing effective that day, and account lifecycle; marts (dim_accounts, dim_reps, dim_date, leads funnel, opportunities, stage transitions, account daily, revenue monthly, revenue bridge, cohort retention, account health). Every staging table's tests now come from the contract, including regex patterns (the Stage 2 `Atlantis` gap is closed). Roles via `deploy/sql/roles.sql`: dbt runs as `transformer`; `bi_reader` was checked to read the marts and nothing else.
+**Why it matters:** Before any golden check exists, 9 metrics computed from the marts already equal the answer key exactly (TPV, net revenue, platform MRR, failure rate, win rate, sales cycle, revenue at risk, lead conversion, pipeline created). Two independent implementations of the same written definition agreeing is the point of writing the definition first.
+**Problem → fix:** (1) `trailing` is a reserved word in Postgres, so it can't name a window: renamed. (2) sqlfluff couldn't render the project's own macros: pointed its jinja templater at `dbt/macros`. (3) Keyword identifiers (`year`, `lines`, `usage`, `accounts`) renamed, not whitelisted. (4) `make db-roles` echoed (synthetic) passwords: silenced. (5) Three tests pinned version numbers the 2.0.0 bump moved; made version-relative and logged for owner review.
+**Numbers:** 196 dbt nodes (models + tests), 0 failures, at full scale and at 0.1; full `dbt build` ~20 s at 500k transactions; identity match rate 98%.
+**Quotable line:** "Nine metrics matched the answer key to the cent before the golden check was even written."
+**Generic vs specific (#skill):** generic: contract-derived dbt tests, identity map pattern (explicit id then unique domain), exclusions as one macro, a role script using psql \gexec, an at-risk rule shared by answer key and mart. Specific: payments revenue components, corridors, Stripe/ledger shapes.
+**Tags:** #linkedin #article #case-study #skill
+
 ---
 
 ## Owner notes
@@ -250,3 +267,4 @@ _(Your own words, any time. Rough is fine.)_
 | 1 Contract | 2026-11-23 | 2026-11-23 | 3 | validator caught a YAML bug in the contract |
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
+| 4 Transformations | 2026-11-24 | pending CI | 4 | reserved word, sqlfluff macros, version-pinned tests |

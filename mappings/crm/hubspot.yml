@@ -2,7 +2,7 @@
 # Compile: make compile-maps CRM=hubspot
 
 crm: hubspot
-contract_version: 1.0.0
+contract_version: 2.0.0
 source_schema: crm_hubspot # where the CRM sync lands HubSpot's raw tables
 timezone: UTC # HubSpot lands naive timestamps; they are UTC (everything in this project is UTC)
 
