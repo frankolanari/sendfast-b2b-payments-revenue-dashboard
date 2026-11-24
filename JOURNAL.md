@@ -255,6 +255,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: when a golden metric is off by a few entities, re-run the truth under each candidate definition before touching SQL; a small CI scale can miss a cohort-level bug, so the full-scale local gate is the real one. Specific: unmatched billing customers and CRM-only fields.
 **Tags:** #linkedin #x #article #book #skill
 
+## 2026-11-24 · Stage 5 · Gate 5 passed in CI and merged
+**Type:** gate-pass
+**What happened:** All 7 CI checks green on PR #7. The integration job's new golden step printed 19/19 against the scale 0.1 key (checked in the job log, not assumed from the green tick). Merged to `main` and tagged `gate-5` on `8526e8f`, after checking that the merged commit carries `metrics/metrics.yml` and `scripts/golden_check.py`.
+**Follow-up decision:** the owner asked whether the 7 unmatched customers should get matching CRM records instead. Answer: no. They are already handled (revenue fully counted; excluded or `unknown` only where CRM data is needed), and an imperfect match rate is a deliberate test of the dashboard against an untidy CRM. The owner agreed to leave them.
+**Evidence:** PR #7, tag `gate-5` on `8526e8f`, `docs/gates/log.md`.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -294,4 +301,4 @@ _(Your own words, any time. Rough is fine.)_
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
-| 5 Golden numbers | 2026-11-24 | pending CI | 1 | 17/19 then 19/19 after the owner-approved key change |
+| 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
