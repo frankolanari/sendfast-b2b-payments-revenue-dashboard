@@ -30,6 +30,7 @@ Toolchain: Python 3.12 via `uv`, Node 24 LTS via `pnpm`. Docker for the stack.
 11. Follow the cloud-ready rules in Section 2A from the first commit: config from env only, no data in the `public` schema, roles via `deploy/sql/roles.sql`, and a proxy that runs on both Node and Cloudflare Workers.
 12. Keep `JOURNAL.md` as you go (Section 14). Write an entry at every gate pass, every blocked gate, every approved exception, every owner decision, and every surprise. Be honest: failures and dead ends are the most valuable entries. Never edit or delete past entries; add a correction entry instead.
 13. Tag reusable lessons `#skill`, and for each stage note what was generic vs domain-specific. Stage 11 is built from these.
+14. UTC everywhere (D15): generated data, staging, marts, database sessions, Metabase, the front end and charts. Never introduce a local time zone; a source that lands local times is converted to UTC in staging.
 
 ## Workflow
 

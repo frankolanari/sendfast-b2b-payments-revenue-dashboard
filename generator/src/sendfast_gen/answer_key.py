@@ -414,7 +414,7 @@ def dirty_rows(w: World) -> dict[str, Any]:
         "close_date_before_created_date": int(w.opps["bad_close_date"].sum()),
         "null_lead_source_leads": int(w.leads["observed_source"].isna().sum()),
         "null_lead_source_opportunities": int(w.opps["observed_source"].isna().sum()),
-        "naive_timestamps": {"source": "crm_hubspot", "timezone": w.cfg["crm"]["hubspot_timezone"]},
+        "naive_timestamps": {"source": "crm_hubspot", "timezone": "UTC"},
         "orphan_merchants": int((w.merchants["account_id"] < 0).sum()),
         "orphan_transactions": int((w.transactions["account_id"] < 0).sum()),
     }

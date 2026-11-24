@@ -15,7 +15,6 @@ size: # at scale 1.0
   orphan_merchants: 3 # merchants that exist in the ledger but not in billing or the CRM
 
 crm:
-  hubspot_timezone: America/New_York # HubSpot raw timestamps are naive local wall-clock times
   new_company_share: 0.85 # a lead is for a new company; otherwise an existing one
   lead_sources: { inbound: 0.33, outbound: 0.25, paid: 0.25, partner: 0.17 }
   conversion_rate: { inbound: 0.34, outbound: 0.24, paid: 0.30, partner: 0.42 }

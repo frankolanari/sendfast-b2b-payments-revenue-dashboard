@@ -203,6 +203,15 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **What happened:** (1) Billing and ledger ids are opaque hashes; the first draft built them from CRM ids, which would have let identity resolution "cheat". (2) Close-date-before-create dirty rows are a fixed count (at least 2), not a coin flip, so the 0.1 CI scale always contains them; this surfaced when the dirty-rows test found zero at scale 0.1. (3) The ruff line limit stayed at 100: 125 long lines were fixed in the code (formatter plus value-preserving string splits, verified by the answer keys not changing), not by raising the limit. (4) `deploy/sql/roles.sql` moves to Stage 4, where dbt first needs the `transformer` role.
 **Tags:** #skill
 
+## 2026-11-24 · Stage 3 · Owner decision: UTC everywhere
+**Type:** decision
+**What happened:** After Gate 3 the owner ruled: "timezones should always be UTC everywhere." The generator had made HubSpot land naive New York local times, to exercise time-zone conversion. That was reversed: HubSpot timestamps are now naive UTC (the dirty row is the missing zone marker, not a different zone), the map declares `UTC`, both Postgres servers and Metabase's JVM are pinned to UTC, and the rule is now locked decision D15 and agent rule 14. The pending test exception was withdrawn by restoring the test, since its reason no longer exists.
+**Why it matters:** Mixed time zones are where revenue dashboards quietly disagree with finance: a transaction at 23:30 in Lagos lands in a different day, month or quarter depending on who asks. One zone end to end removes that whole class of bug.
+**Options considered / pushback:** Keep a local-time source to show the compiler converting it (rejected by the owner: the realism isn't worth a second zone in the system). The compiler still supports `timezone:` in a map, as the way a future CRM's local times get converted to UTC at the door.
+**Numbers:** all 6 stories still detected on all 6 seeds; answer keys regenerated.
+**Quotable line:** "Pick one time zone. Then pick UTC."
+**Tags:** #linkedin #x #skill
+
 ---
 
 ## Owner notes
@@ -240,4 +249,4 @@ _(Your own words, any time. Rough is fine.)_
 | 0 Scaffold | 2026-11-23 | 2026-11-23 | 4 local + 1 CI | one false pass (untracked files) |
 | 1 Contract | 2026-11-23 | 2026-11-23 | 3 | validator caught a YAML bug in the contract |
 | 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
-| 3 Generator | 2026-11-24 | pending CI | 6 | warm-up, story robustness, lint |
+| 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |

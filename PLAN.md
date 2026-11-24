@@ -33,6 +33,7 @@ Supersedes v1 (`metabase-portfolio-plan.md`). Drop this file into the repo root 
 | D12 | **The AI boundary is enforced, not just a rule.** Production credentials never live in the repo, in CI, or anywhere the coding agent can read | This is what makes the privacy claim credible |
 | D13 | GitHub Actions for CI/CD. The static snapshot is deployed to Cloudflare Pages | Automated proof at every stage. A clickable demo with no hosted Metabase |
 | D14 | **Build locally now, deploy to cloud later (Stage 10).** Target: data DB on **Supabase Cloud**, Metabase self-hosted on a **VPS via Coolify**, React on **Cloudflare Pages**, proxy as a **Cloudflare Worker**. Everything built locally must follow the cloud-ready rules in Section 2A | Local is faster to build. The cloud move should be configuration, not a rewrite |
+| D15 | **UTC everywhere.** Every timestamp in every source, model, database session, Metabase setting and chart is UTC. Postgres and Metabase are pinned to UTC; a source that lands local times is converted to UTC in staging, and nothing downstream uses another zone | Owner decision, 2026-11-24. One zone removes a whole class of day-boundary and DST bugs, and makes every number reproducible |
 
 ---
 
@@ -325,7 +326,7 @@ stage_history:
   - test and internal accounts (`test`, `@ourcompany.com`)
   - close date earlier than created date
   - null lead sources
-  - timestamps without a timezone in one source
+  - timestamps without a timezone marker in one source (naive, but UTC: see D15)
   - a few orphaned transactions (merchant not in billing)
 - **Planted stories**, each with a parameter in `config.yml` and an entry in the answer key:
   1. Corridor failure spike in one month (one corridor, one rail)
