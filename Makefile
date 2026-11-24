@@ -5,15 +5,20 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 COMPOSE := docker compose
+
+# Local settings (.env) reach every recipe: the DB loader reads them. Synthetic values only.
+-include .env
+export
 WAIT_TIMEOUT ?= 300
 
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
+        answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
 help: ## List targets
-	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-20s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*## "} {printf "  %-20s %s\n", $$1, $$2}'
 
 env: ## Fail if .env is missing
 	@test -f .env || { echo "Missing .env. Run: cp .env.example .env"; exit 1; }
@@ -45,6 +50,27 @@ contract-check: ## Validate contract, dictionary freshness, changelog, version b
 contract-dictionary: ## Regenerate contract/data_dictionary.md from the contract
 	uv run python scripts/contract_check.py render
 
+# ── Synthetic data generator (Stage 3) ───────────────────────────────────
+SCALE ?= 1.0
+GEN := PYTHONPATH=generator/src uv run python -m sendfast_gen
+
+answer-keys: ## Regenerate the committed answer keys (scale 1.0 and 0.1)
+	$(GEN) answer-key --scale 1.0
+	$(GEN) answer-key --scale 0.1
+
+answer-keys-check: ## Fail if a committed answer key differs from a fresh computation
+	$(GEN) check-answer-key --scale 1.0
+	$(GEN) check-answer-key --scale 0.1
+
+stories: ## Every planted story is detectable in the raw tables (full scale)
+	$(GEN) stories --scale 1.0
+
+profile-charts: ## Gate 3 sign-off charts -> docs/evidence/gate-3/
+	$(GEN) charts --scale 1.0
+
+generate-timed: env ## Full-scale generate + load must finish in under 5 minutes
+	$(GEN) generate --scale 1.0 --max-seconds 300
+
 # ── CRM mapping layer (Stage 2) ──────────────────────────────────────────
 CRM ?= hubspot
 DBT := uv run dbt --no-use-colors
@@ -62,8 +88,8 @@ dbt-parse: ## dbt parses the project (Jinja, sources, refs, tests) without a dat
 	$(DBT) parse $(DBT_DIRS)
 
 # ── Pipeline (built in later stages) ─────────────────────────────────────
-generate: ## Synthetic data generator (Stage 3)
-	@echo "Not built yet: Stage 3." && exit 1
+generate: env ## Generate seeded synthetic data and load the raw schemas (SCALE=1.0 by default)
+	$(GEN) generate --scale $(SCALE)
 compile-maps: ## CRM YAML map -> dbt staging models (CRM=hubspot by default)
 	uv run python scripts/compile_mappings.py compile --crm $(CRM)
 transform: ## dbt build (Stage 4)
@@ -90,4 +116,7 @@ gate-1: gate-0 contract-check test ## G1: contract valid, versioned, dictionary 
 gate-2: gate-1 compiled-check compile-idempotent dbt-parse ## G2: maps compile, up to date, idempotent (+ G0-1)
 	@echo "Gate 2 passed."
 
-gates: gate-2 ## Run every gate built so far
+gate-3: gate-2 answer-keys-check stories generate-timed ## G3: invariants, determinism, stories, <5 min (+ G0-2)
+	@echo "Gate 3 passed."
+
+gates: gate-3 ## Run every gate built so far

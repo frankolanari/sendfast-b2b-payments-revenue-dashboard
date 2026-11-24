@@ -1,0 +1,220 @@
+{
+  "counts": {
+    "accounts": 335,
+    "disputes_and_returns": 113,
+    "leads": 400,
+    "live_accounts_excluding_test": 38,
+    "opportunities": 132,
+    "transactions": 50129,
+    "won_accounts_excluding_test": 39
+  },
+  "dirty_rows": {
+    "close_date_before_created_date": 3,
+    "currency_written_naira_sign": 81,
+    "currency_written_ngn_lowercase": 115,
+    "duplicate_contacts_mixed_case_email": 8,
+    "internal_accounts": 3,
+    "naive_timestamps": {
+      "source": "crm_hubspot",
+      "timezone": "America/New_York"
+    },
+    "null_lead_source_leads": 31,
+    "null_lead_source_opportunities": 11,
+    "orphan_merchants": 1,
+    "orphan_transactions": 54,
+    "test_accounts": 5
+  },
+  "identity": {
+    "billing_customers": 39,
+    "domain": 3,
+    "explicit_id": 35,
+    "match_rate": 0.974359,
+    "unmatched": 1
+  },
+  "meta": {
+    "as_of": "2026-10-31",
+    "golden_month": "2026-09",
+    "history_from": "2024-11-01",
+    "scale": 0.1,
+    "seed": 20261031,
+    "trailing_12_months": [
+      "2025-11-01",
+      "2026-10-31"
+    ]
+  },
+  "metrics": {
+    "activation_days": {
+      "accounts": 15,
+      "definition": "Median days from won date (close_date of the account's first won opportunity) to its first succeeded transaction, for accounts won in calendar 2025 that have transacted.",
+      "value": 41.0
+    },
+    "dispute_return_rate": {
+      "definition": "Disputes plus returns opened in the golden month / succeeded transactions in the golden month.",
+      "disputes": 7,
+      "returns": 6,
+      "value": 0.003076
+    },
+    "failure_rate": {
+      "definition": "Failed / all transactions (any status) in the golden month.",
+      "transactions": 4405,
+      "value": 0.037911
+    },
+    "gross_revenue_retention": {
+      "definition": "As NRR, but each account's golden-month revenue is capped at its revenue 12 months earlier.",
+      "value": 0.929426
+    },
+    "lead_to_opp_conversion": {
+      "definition": "Share of leads created in calendar 2025 (UTC) that have converted_at set.",
+      "leads": 130,
+      "value": 0.346154
+    },
+    "logo_churn_contract": {
+      "base": 17,
+      "churned": 1,
+      "definition": "Accounts live by 2025-10-31 and not contract-churned by then, whose subscription ended in the trailing 12 months, as a share of those accounts.",
+      "value": 0.058824
+    },
+    "logo_churn_silent": {
+      "definition": "Live accounts with no contract end whose last succeeded transaction is on or before 2026-09-01 (60 days before the as-of date).",
+      "value": 2
+    },
+    "net_revenue_12m_per_account_by_lead_source": {
+      "accounts": {
+        "inbound": 4,
+        "outbound": 3,
+        "paid": 2,
+        "partner": 5
+      },
+      "definition": "For accounts that went live inside the data window and on or before 2025-10-31: net revenue in their first 12 calendar months from the go-live month; the median per account, by the lead source of the account's first won opportunity (missing -> unknown). Median, not mean, so one very large account cannot decide the comparison.",
+      "value": {
+        "inbound": 10347.141422,
+        "outbound": 4835.744675,
+        "paid": 119317.221657,
+        "partner": 26824.793149
+      }
+    },
+    "net_revenue_retention": {
+      "accounts": 20,
+      "definition": "Net revenue in the golden month from accounts live (went_live_at) on or before the end of the month 12 months earlier, divided by those accounts' net revenue in that earlier month. Churned accounts count as zero; reactivated accounts count.",
+      "value": 1.113896
+    },
+    "net_revenue_usd": {
+      "definition": "Platform fee (invoice lines for the month) + usage fee (succeeded USD volume x fee_bps effective on the transaction date) + FX margin (cross-currency succeeded USD volume x fx_margin_bps) + minimum-commit true-up (invoice lines whose period is the month), golden month.",
+      "fx_margin": 109515.007103,
+      "platform_fee": 50700.0,
+      "true_up": 14903.19,
+      "usage_fee": 216511.833982,
+      "value": 391630.031085
+    },
+    "pipeline_created_usd": {
+      "definition": "Sum of amount_usd of opportunities created in the golden month (null amounts excluded).",
+      "month": "2026-09",
+      "opportunities": 4,
+      "value": 740800.0
+    },
+    "platform_mrr_usd": {
+      "definition": "Sum of platform-fee invoice lines whose period is the golden month.",
+      "value": 50700.0
+    },
+    "revenue_at_risk_usd": {
+      "accounts": 1,
+      "definition": "Accounts live before 2026-06-01 and not contract-churned by the end of the golden month are at risk if golden-month volume < 0.5 x their average monthly volume over the previous 3 months, or golden-month failure rate > 0.1 on at least 20 transactions. Revenue at risk = their average monthly net revenue over those 3 months.",
+      "value": 2358.2369
+    },
+    "sales_cycle_days": {
+      "definition": "Median days from created_at (UTC date) to close_date for won opportunities closed in the trailing 12 months, excluding rows whose close_date is before their created date.",
+      "opportunities": 15,
+      "value": 78.0
+    },
+    "sales_velocity_usd_per_day": {
+      "avg_won_amount_usd": 70966.666667,
+      "definition": "open opportunities x average won amount_usd (trailing 12 months) x win_rate / sales_cycle_days, as of 2026-10-31.",
+      "open_opportunities": 12,
+      "value": 3484.451718
+    },
+    "take_rate": {
+      "definition": "net_revenue_usd / total_payment_volume_usd, golden month.",
+      "value": 0.005823
+    },
+    "top10_revenue_concentration": {
+      "definition": "Share of trailing-12-month net revenue earned from the 10 accounts with the most.",
+      "value": 0.892375
+    },
+    "total_payment_volume_usd": {
+      "definition": "Sum of succeeded transaction amounts in USD (amount / FX rate of the source currency on the transaction's UTC date) in the golden month.",
+      "transactions": 4226,
+      "value": 67260680.138489
+    },
+    "win_rate": {
+      "closed": 47,
+      "definition": "Won / closed (won + lost) opportunities with close_date in the trailing 12 months (2025-11-01..2026-10-31).",
+      "value": 0.319149,
+      "won": 15
+    }
+  },
+  "stories": {
+    "corridor_failure_spike": {
+      "corridor": "USD-NGN",
+      "failure_rate": 0.258595,
+      "median_failure_rate_other_months": 0.040663,
+      "month": "2026-03",
+      "rail": "nip"
+    },
+    "partner_leads": {
+      "win_rate_by_source": {
+        "inbound": 0.371429,
+        "outbound": 0.368421,
+        "paid": 0.321429,
+        "partner": 0.310345,
+        "unknown": 0.111111
+      }
+    },
+    "pricing_change_cohort": {
+      "change_date": "2025-09-01",
+      "cohort": "2025Q1",
+      "logo_retention_month_12_by_cohort": {
+        "2024Q2": {
+          "accounts": 4,
+          "logo_retention_month_12": 1.0
+        },
+        "2024Q3": {
+          "accounts": 1,
+          "logo_retention_month_12": 0.0
+        },
+        "2024Q4": {
+          "accounts": 5,
+          "logo_retention_month_12": 0.8
+        },
+        "2025Q1": {
+          "accounts": 2,
+          "logo_retention_month_12": 0.0
+        },
+        "2025Q2": {
+          "accounts": 2,
+          "logo_retention_month_12": 0.5
+        },
+        "2025Q3": {
+          "accounts": 6,
+          "logo_retention_month_12": 0.833333
+        }
+      }
+    },
+    "revenue_concentration": {
+      "account_id": 10000014,
+      "tpv_share_t12m": 0.292441
+    },
+    "slipping_rep": {
+      "open_pipeline_usd_share": 0.174136,
+      "past_due_share_of_open": 0.5,
+      "past_due_share_of_open_other_reps": 0.0,
+      "rep_owner_id": 70000005
+    },
+    "slow_activation": {
+      "accounts_fast": 21,
+      "accounts_slow": 10,
+      "churn_rate_fast": 0.142857,
+      "churn_rate_slow": 0.6,
+      "threshold_days": 45
+    }
+  }
+}

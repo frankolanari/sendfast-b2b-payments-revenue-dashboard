@@ -21,7 +21,7 @@ renamed as (
             when 'closedlost' then 'lost'
             else cast(value as text)
         end as stage,
-        (cast(timestamp as timestamp) at time zone 'UTC') as entered_at
+        (cast(timestamp as timestamp) at time zone 'America/New_York') as entered_at
     from source
 
 )

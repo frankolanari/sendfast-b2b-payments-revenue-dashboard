@@ -160,6 +160,49 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: map format, compiler, unmapped-values model, contract-derived tests, README. Specific: HubSpot's raw shape and value lists.
 **Tags:** #article #case-study #video #skill
 
+## 2026-11-23 · Stage 2 · Gate 2 passed and merged
+**Type:** gate-pass
+**What happened:** CI green on all five jobs (lint, secrets, contract-check, unit, compiled-up-to-date). PR #3 merged and tagged `gate-2`; `compiled-up-to-date` added to the required checks. The tag push hit a transient macOS keychain error again; a retry worked.
+**Evidence:** PR #3, tag `gate-2` on `b4fa09d`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 3 · A synthetic company with a past, and an answer key
+**Type:** milestone
+**What happened:** Built the generator: a simulated SendFast (leads, deals with slips and stage loops, onboarding, usage with S-curve ramps, power-law volume, weekly/payday/December seasonality, churn hazards, pricing with effective dates, FX with an NGN devaluation, disputes 30-90 days late, Stripe-shaped invoices with min-commit true-ups). It lands the data the way each source really would: HubSpot with internal codes, free-text countries and naive New York timestamps; Stripe with minor units, Unix time and lower-case currencies; the ledger with `ngn`/`₦`, legal-name variants and orphan merchants. The answer key computes all 19 golden metrics from the generator's truth, after the exclusions correct cleaning must make, with each metric's definition written next to its value.
+**Why it matters:** Stage 5 will compare the warehouse against this key. Every definition is now fixed before any SQL exists, so the SQL has to match the definition, not the other way round.
+**Numbers:** full scale: 4,000 leads, 1,221 deals, 373 billing customers, 500,059 transactions, 15 raw tables; generate + load 7.8 s (limit 300 s). Identity match rate 98%. 26 generator tests; 76 tests in total. The Stage 2 HubSpot staging models, run by dbt on this generated data: 44/44 contract tests pass, 0 unmapped values.
+**Quotable line:** "The answer key was written before the warehouse. The warehouse has to earn it."
+**Evidence:** `generator/answer_keys/scale_1.json`, `docs/evidence/gate-3/*.png`.
+**Generic vs specific (#skill):** generic: world -> raw emitter -> answer key -> raw-only story detectors; seeded independent RNG streams; determinism by hashing the exact bytes loaded; charts for a realism sign-off. Specific: the payments business model, corridors, rails, Stripe/HubSpot shapes.
+**Tags:** #article #case-study #video #book #skill
+
+## 2026-11-24 · Stage 3 · The first charts looked fake, so the company got a past
+**Type:** problem-fix
+**What happened:** The first profile charts showed volume and revenue starting from zero in early 2025: a company that didn't exist until the data began. Nobody would believe it. Fix: simulate 12 extra "warm-up" months before the data window, so customers already exist on day one. The CRM keeps its full history (as CRMs do); the ledger, invoices and FX hold the 24-month window. Metrics that follow an account from go-live only use accounts that went live inside the window.
+**Why it matters:** "Looks real" was the owner's sign-off question, and the chart answered it before the owner had to.
+**Problem → fix:** symptom: volume chart starting at $0 and a meaningless 10% failure spike in the first month (tiny sample). Root cause: simulation start = data start. Fix: `warmup_months: 12`. Caught by looking at the Gate 3 charts, not by any test.
+**Quotable line:** "Synthetic data that starts on the first day of the dataset is a company with no past."
+**Tags:** #linkedin #article #skill
+
+## 2026-11-24 · Stage 3 · Tuning a story to one seed is cheating; test it across seeds
+**Type:** pushback
+**What happened:** Each planted story has a detector that reads only the raw tables and, where it can, searches for the story instead of being told where it is (the spike detector scans every corridor, rail and month). Three stories failed along the way: partner revenue (one whale account decided a mean), slow activation (too weak), and the pricing-change cohort, which flipped from pass to fail twice as unrelated changes reshuffled the random numbers. That was the warning sign: the agent was tuning to one seed. Fixes were structural, not numeric luck: median instead of mean per account; referred customers bigger and stickier; the price rise as a churn shock. Then every story was checked on six seeds; all six were detected on all six seeds.
+**Why it matters:** A demo story that only appears for one random seed is a coincidence, not a finding. The dashboard's insights have to survive a re-roll.
+**Options considered / pushback:** Lower the detection thresholds (rejected: thresholds were set before the results; moving them would be fitting the check to the data).
+**Numbers:** 6 seeds x 6 stories = 36/36 detected. Pricing cohort month-12 activity 19-41% vs ~50-100% for other cohorts.
+**Quotable line:** "If your planted story disappears when you change the seed, you didn't plant it. You found it by accident."
+**Tags:** #linkedin #x #article #book #skill
+
+## 2026-11-24 · Stage 3 · Exception: a Stage 2 test changed (pending owner review)
+**Type:** decision
+**What happened:** `test_timestamps_are_converted_from_map_timezone` asserted the HubSpot map's old timezone (`UTC`). The map deliberately moved to `America/New_York`, because HubSpot now lands naive local timestamps. The test was rewritten to read the timezone from the map and to check that a different timezone changes the SQL too: stricter, not weaker. Rule 1a needs owner approval for any test change at a gate, so it is listed under "Exceptions pending owner review" in `docs/gates/log.md`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 3 · Other deviations
+**Type:** decision
+**What happened:** (1) Billing and ledger ids are opaque hashes; the first draft built them from CRM ids, which would have let identity resolution "cheat". (2) Close-date-before-create dirty rows are a fixed count (at least 2), not a coin flip, so the 0.1 CI scale always contains them; this surfaced when the dirty-rows test found zero at scale 0.1. (3) The ruff line limit stayed at 100: 125 long lines were fixed in the code (formatter plus value-preserving string splits, verified by the answer keys not changing), not by raising the limit. (4) `deploy/sql/roles.sql` moves to Stage 4, where dbt first needs the `transformer` role.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -194,3 +237,7 @@ _(Your own words, any time. Rough is fine.)_
 | Stage | Started | Gate passed | Loops at gate | Notes |
 |---|---|---|---|---|
 | Planning | 2026-11-23 | n/a | n/a | Plan v2 finalized |
+| 0 Scaffold | 2026-11-23 | 2026-11-23 | 4 local + 1 CI | one false pass (untracked files) |
+| 1 Contract | 2026-11-23 | 2026-11-23 | 3 | validator caught a YAML bug in the contract |
+| 2 Mapping | 2026-11-23 | 2026-11-23 | 4 | sqlfluff templater swap |
+| 3 Generator | 2026-11-24 | pending CI | 6 | warm-up, story robustness, lint |

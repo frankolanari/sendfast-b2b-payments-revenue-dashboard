@@ -22,8 +22,8 @@ renamed as (
             when 'OFFLINE' then 'outbound'
             else cast(hs_analytics_source as text)
         end as lead_source,
-        (cast(createdate as timestamp) at time zone 'UTC') as created_at,
-        (cast(hs_lead_converted_at as timestamp) at time zone 'UTC') as converted_at
+        (cast(createdate as timestamp) at time zone 'America/New_York') as created_at,
+        (cast(hs_lead_converted_at as timestamp) at time zone 'America/New_York') as converted_at
     from source
 
 )
