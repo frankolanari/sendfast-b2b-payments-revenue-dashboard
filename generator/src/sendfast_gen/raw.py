@@ -1,7 +1,7 @@
 """Turn the world into what each upstream source actually lands (PLAN.md Stage 3).
 
 - crm_hubspot: HubSpot-shaped; internal stage and source codes; free-text countries; naive
-  timestamps in the portal's local time zone (America/New_York).
+  timestamps (no zone marker), which are UTC. Everything in this project is UTC.
 - billing: Stripe-shaped; minor units; Unix timestamps; lower-case currency codes.
 - ledger: the payments platform's own DB; minor units; timestamptz; NGN sometimes written `ngn`/`₦`.
 - rates: FX rates and per-account pricing with effective dates.
@@ -17,7 +17,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -94,8 +93,9 @@ def _ts_utc(values) -> list[str | None]:
     return _s(values, _utc_text)
 
 
-def _ts_local(values, tz: ZoneInfo) -> list[str | None]:
-    return _s(values, lambda v: pd.Timestamp(v).tz_convert(tz).strftime("%Y-%m-%d %H:%M:%S"))
+def _ts_naive_utc(values) -> list[str | None]:
+    """UTC wall-clock time with the zone marker dropped, as HubSpot exports it."""
+    return _s(values, lambda v: pd.Timestamp(v).tz_convert("UTC").strftime("%Y-%m-%d %H:%M:%S"))
 
 
 def _unix(values) -> list[str | None]:
@@ -141,7 +141,6 @@ def _legal_variant(name: str, key: int) -> str:
 
 # ── Sources ──────────────────────────────────────────────────────────────
 def crm_hubspot(w: World) -> list[RawTable]:
-    tz = ZoneInfo(w.cfg["crm"]["hubspot_timezone"])
     reps, acc, cust = w.reps, w.accounts, w.customers.set_index("account_id")
     owner_id = {int(r): 70_000_000 + int(r) for r in reps["rep_id"]}
     has_ref = {int(a): bool(v) for a, v in cust["has_billing_ref"].items()}
@@ -177,7 +176,7 @@ def crm_hubspot(w: World) -> list[RawTable]:
             ("country", "text", _s(COUNTRY_NAMES[c] for c in acc["country"])),
             ("customer_segment", "text", _s(SEGMENT_HS[s] for s in acc["segment"])),
             ("hubspot_owner_id", "bigint", _s(owner_id[int(r)] for r in acc["owner_rep"])),
-            ("createdate", "timestamp", _ts_local(acc["created_at"], tz)),
+            ("createdate", "timestamp", _ts_naive_utc(acc["created_at"])),
             ("stripe_customer_id", "text", refs),
         ],
     )
@@ -191,7 +190,7 @@ def crm_hubspot(w: World) -> list[RawTable]:
             ("associatedcompanyid", "bigint", _s(con["account_id"])),
             ("email", "text", _s(con["email"])),
             ("jobtitle", "text", _s(con["title"])),
-            ("createdate", "timestamp", _ts_local(con["created_at"], tz)),
+            ("createdate", "timestamp", _ts_naive_utc(con["created_at"])),
         ],
     )
 
@@ -215,8 +214,8 @@ def crm_hubspot(w: World) -> list[RawTable]:
                     for s, i in zip(ld["observed_source"], ld["lead_id"], strict=True)
                 ],
             ),
-            ("createdate", "timestamp", _ts_local(ld["created_at"], tz)),
-            ("hs_lead_converted_at", "timestamp", _ts_local(ld["converted_at"], tz)),
+            ("createdate", "timestamp", _ts_naive_utc(ld["created_at"])),
+            ("hs_lead_converted_at", "timestamp", _ts_naive_utc(ld["converted_at"])),
         ],
     )
 
@@ -229,7 +228,7 @@ def crm_hubspot(w: World) -> list[RawTable]:
             ("associated_company_id", "bigint", _s(op["account_id"])),
             ("hubspot_owner_id", "bigint", _s(owner_id[int(r)] for r in op["owner_rep"])),
             ("amount", "numeric", _s(op["amount_usd"], lambda v: f"{float(v):.2f}")),
-            ("createdate", "timestamp", _ts_local(op["created_at"], tz)),
+            ("createdate", "timestamp", _ts_naive_utc(op["created_at"])),
             (
                 "closedate",
                 "timestamp",
@@ -289,7 +288,7 @@ def crm_hubspot(w: World) -> list[RawTable]:
             ("object_id", "bigint", _s(hist["object_id"])),
             ("property_name", "text", _s(hist["property_name"])),
             ("value", "text", _s(hist["value"])),
-            ("timestamp", "timestamp", _ts_local(hist["at"], tz)),
+            ("timestamp", "timestamp", _ts_naive_utc(hist["at"])),
         ],
     )
     return [owners, companies, contacts, leads, deals, history]

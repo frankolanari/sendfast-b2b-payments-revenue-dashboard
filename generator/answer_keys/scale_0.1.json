@@ -16,7 +16,7 @@
     "internal_accounts": 3,
     "naive_timestamps": {
       "source": "crm_hubspot",
-      "timezone": "America/New_York"
+      "timezone": "UTC"
     },
     "null_lead_source_leads": 31,
     "null_lead_source_opportunities": 11,

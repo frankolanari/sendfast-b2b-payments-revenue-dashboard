@@ -13,6 +13,7 @@ services:
       POSTGRES_DB: ${DATA_DB_NAME:?set in .env}
       POSTGRES_USER: ${DATA_DB_ADMIN_USER:?set in .env}
       POSTGRES_PASSWORD: ${DATA_DB_ADMIN_PASSWORD:?set in .env}
+    command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"] # UTC everywhere
     ports:
       - "${DATA_DB_HOST_PORT:-55432}:5432"
     volumes:
@@ -29,6 +30,7 @@ services:
       POSTGRES_DB: ${MB_APP_DB_NAME:?set in .env}
       POSTGRES_USER: ${MB_APP_DB_USER:?set in .env}
       POSTGRES_PASSWORD: ${MB_APP_DB_PASSWORD:?set in .env}
+    command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"] # UTC everywhere
     volumes:
       - postgres-metabase:/var/lib/postgresql/data
     healthcheck:
@@ -52,6 +54,7 @@ services:
       MB_SITE_URL: ${MB_SITE_URL:?set in .env}
       MB_ANON_TRACKING_ENABLED: "false"
       MB_CHECK_FOR_UPDATES: "false"
+      JAVA_TIMEZONE: UTC # UTC everywhere; the report timezone is set to UTC by the bootstrap (Stage 6)
     ports:
       - "${MB_HOST_PORT:-3000}:3000"
     healthcheck:

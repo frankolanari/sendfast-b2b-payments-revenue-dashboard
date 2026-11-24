@@ -14,7 +14,7 @@ renamed as (
         cast(associatedcompanyid as text) as account_id,
         cast(email as text) as email,
         cast(jobtitle as text) as title,
-        (cast(createdate as timestamp) at time zone 'America/New_York') as created_at
+        (cast(createdate as timestamp) at time zone 'UTC') as created_at
     from source
 
 )

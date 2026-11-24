@@ -4,7 +4,7 @@
 crm: hubspot
 contract_version: 1.0.0
 source_schema: crm_hubspot # where the CRM sync lands HubSpot's raw tables
-timezone: America/New_York # HubSpot lands naive timestamps in the portal's local time
+timezone: UTC # HubSpot lands naive timestamps; they are UTC (everything in this project is UTC)
 
 users:
   source: owners

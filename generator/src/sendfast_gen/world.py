@@ -219,15 +219,10 @@ def as_date(value: Any) -> date:
     return value if isinstance(value, date) else date.fromisoformat(str(value))
 
 
-def business_time(rng: np.random.Generator, d: date, tz_offset_hours: int = -5) -> datetime:
-    """A UTC timestamp during local business hours (08:00-18:00) on calendar date `d`.
-
-    Keeping CRM event times well inside the working day keeps them away from local midnight and
-    DST transitions, so the calendar date is the same whichever zone the timestamp is read in.
-    """
+def business_time(rng: np.random.Generator, d: date) -> datetime:
+    """A UTC timestamp between 08:00 and 18:00 UTC on calendar date `d`. Everything is UTC."""
     seconds = int(rng.integers(8 * 3600, 18 * 3600))
-    local = datetime(d.year, d.month, d.day) + timedelta(seconds=seconds)
-    return (local - timedelta(hours=tz_offset_hours)).replace(tzinfo=UTC)
+    return datetime(d.year, d.month, d.day, tzinfo=UTC) + timedelta(seconds=seconds)
 
 
 def scaled(cfg: dict[str, Any], n: float, minimum: int = 1) -> int:
