@@ -362,6 +362,11 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: card-per-preset snapshots for a database-free demo; click-to-filter on top of a chart kit via the tooltip datum; never smooth sparse time series. Specific: the pages.
 **Tags:** #linkedin #article #case-study #video #skill
 
+## 2026-11-25 · Stage 7 · Gate 7, loop 1: the unit runner ran the browser tests
+**Type:** problem-fix
+**What happened:** The first full `make gate-7` failed in `web-check`: Vitest's default pattern also matched `web/e2e/pages.spec.ts` and Playwright refused to be called from it. Unit tests had passed only because they were last run before the e2e file existed. Fix: Vitest includes `src/**/*.test.ts` only; the browser tests run through Playwright. Whole gate rerun.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
