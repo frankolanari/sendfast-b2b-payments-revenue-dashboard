@@ -6,6 +6,34 @@ import {
 import { fetchCard } from "@/api/client";
 import type { CardSlug } from "@/api/cards.generated";
 import { currency, percent } from "@/lib/format";
+import { applyTheme, saveTheme, storedTheme } from "@/design/theme";
+import type { Mode } from "@/design/tokens";
+import { Moon, Sun } from "lucide-react";
+import { useState } from "react";
+
+function ThemeToggle() {
+  const [mode, setMode] = useState<Mode>(storedTheme);
+  const next: Mode = mode === "dark" ? "light" : "dark";
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        applyTheme(next);
+        saveTheme(next);
+        setMode(next);
+      }}
+      aria-label={`Switch to ${next} mode`}
+      title={`Switch to ${next} mode`}
+      className="grid size-9 place-items-center rounded-lg text-ink-secondary transition-colors hover:bg-foreground/10 hover:text-foreground"
+    >
+      {mode === "dark" ? (
+        <Sun className="size-4" />
+      ) : (
+        <Moon className="size-4" />
+      )}
+    </button>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, retry: 1 } },
@@ -46,7 +74,7 @@ function KpiTile({ slug, label, format }: (typeof TILES)[number]) {
     queryFn: () => fetchCard(slug, TRAILING_12),
   });
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="shadow-card rounded-xl border bg-card p-5">
       <div className="text-sm text-muted-foreground">{label}</div>
       {/* No tabular-nums here: Cal Sans makes the decimal point full-width under it. */}
       <div className="mt-3 font-display text-4xl tracking-tight">
@@ -69,7 +97,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-background">
-        <header className="sticky top-2 z-10 mx-auto mt-2 flex max-w-6xl items-center gap-6 rounded-2xl bg-muted/80 px-4 py-2.5 backdrop-blur">
+        <header className="glass-bar sticky top-2 z-10 mx-auto mt-2 flex max-w-6xl items-center gap-6 rounded-2xl px-4 py-2">
           <span className="font-display text-xl tracking-tight">SendFast</span>
           <nav className="flex gap-1 text-sm" aria-label="Pages">
             {PAGES.map((p, i) => (
@@ -77,7 +105,7 @@ export function App() {
                 key={p}
                 className={
                   i === 0
-                    ? "rounded-lg bg-card px-3 py-1.5 font-medium shadow-sm"
+                    ? "rounded-lg bg-foreground/10 px-3 py-1.5 font-medium"
                     : "rounded-lg px-3 py-1.5 text-ink-secondary"
                 }
               >
@@ -88,6 +116,7 @@ export function App() {
           <span className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground">
             Synthetic data
           </span>
+          <ThemeToggle />
         </header>
 
         <main className="mx-auto max-w-6xl px-4 py-10">

@@ -14,7 +14,7 @@
  * Never cycle or generate a 9th hue: fold extra series into "Other".
  */
 
-type Mode = "light" | "dark";
+export type Mode = "light" | "dark";
 type Pair = Record<Mode, string>;
 
 const pair = (light: string, dark: string): Pair => ({ light, dark });
@@ -24,7 +24,7 @@ export const tokens = {
     page: pair("#fafaf9", "#0f0f0f"), // the plane behind the cards
     surface: pair("#ffffff", "#1c1c1c"), // cards, charts, popovers
     surfaceSunken: pair("#f3f4f6", "#262626"), // segmented controls, wells, hover washes
-    paper: pair("#e3dccd", "#2b2925"), // the warm highlight panel
+    paper: pair("#e3dccd", "#242321"), // the warm highlight panel
     ink: pair("#242424", "#fafafa"), // primary text, primary buttons
     inkSecondary: pair("#4b4f58", "#d4d5d8"),
     inkMuted: pair("#676b75", "#a1a1a1"), // labels, axis text
@@ -111,10 +111,34 @@ export const tokens = {
   },
   tracking: { display: "-0.02em", tight: "-0.01em", caps: "0.08em" },
 
+  /**
+   * Liquid glass for floating chrome (nav bar, filter bar, popovers): a translucent fill,
+   * a strong blur and a saturation boost, a hairline edge and a faint top highlight.
+   * Designed dark-first; light keeps the same structure.
+   */
+  glass: {
+    bar: pair("#ffffff85", "#1c1c1c85"), // nav and filter bars
+    material: pair("#f3f4f6bd", "#181818b8"), // popovers, menus, tooltips
+    edge: pair("#0000000f", "#ffffff14"), // hairline border
+    highlight: pair("#ffffffb3", "#ffffff0f"), // inset top edge
+    barBlur: "blur(30px) saturate(1.8)",
+    materialBlur: "blur(40px) saturate(1.8)",
+  },
+
+  shadow: {
+    card: pair(
+      "0 1px 2px #0000000f, 0 10px 18px -10px #00000038",
+      "0 1px 2px #0003, 0 8px 14px -8px #0000005c",
+    ),
+    lift: pair("0 10px 18px -10px #00000052", "0 14px 22px -12px #0003"),
+  },
+
   /** Tailwind's spacing unit: p-4 = 4 x this. */
   spacing: "0.25rem",
   radius: "0.625rem",
 } as const;
+
+export const DEFAULT_THEME: Mode = "dark"; // owner, 2026-11-25: design dark-first
 
 /** CSS variables for one mode: shadcn/ui names, Tailwind theme names and chart-kit names. */
 export function cssVariables(mode: Mode): Record<string, string> {
@@ -145,6 +169,15 @@ export function cssVariables(mode: Mode): Record<string, string> {
     "--paper": c.paper[mode],
     "--brand-accent": c.accent[mode],
     "--ink-secondary": c.inkSecondary[mode],
+    "--glass-bar": tokens.glass.bar[mode],
+    "--glass-material": tokens.glass.material[mode],
+    "--glass-edge": tokens.glass.edge[mode],
+    "--glass-highlight": tokens.glass.highlight[mode],
+    "--glass-bar-blur": tokens.glass.barBlur,
+    "--glass-material-blur": tokens.glass.materialBlur,
+    "--shadow-card": tokens.shadow.card[mode],
+    "--shadow-lift": tokens.shadow.lift[mode],
+    "--chart-tooltip-background": tokens.glass.material[mode],
     // charts (kit + ours)
     "--chart-grid": tokens.chart.grid[mode],
     "--chart-label": tokens.chart.label[mode],

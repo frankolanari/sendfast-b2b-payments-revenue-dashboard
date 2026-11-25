@@ -6,6 +6,31 @@
 
 /* Colour, type, spacing and radius VALUES come from src/design/tokens.ts (applyTokens). */
 
+/* Liquid glass (tokens.glass): translucent fill + blur + saturation, hairline edge, top
+   highlight. Used for floating chrome only, never for cards that hold data. */
+@layer components {
+  .glass-bar,
+  .glass {
+    border: 1px solid var(--glass-edge);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      var(--shadow-lift);
+  }
+  .glass-bar {
+    background-color: var(--glass-bar);
+    -webkit-backdrop-filter: var(--glass-bar-blur);
+    backdrop-filter: var(--glass-bar-blur);
+  }
+  .glass {
+    background-color: var(--glass-material);
+    -webkit-backdrop-filter: var(--glass-material-blur);
+    backdrop-filter: var(--glass-material-blur);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
