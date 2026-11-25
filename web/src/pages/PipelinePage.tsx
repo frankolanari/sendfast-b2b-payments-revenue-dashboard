@@ -11,7 +11,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { GroupBy } from "@/components/GroupBy";
 import { cap, num } from "@/insights/common";
 import {
-  channelInsight,
+  outcomeInsight,
   ageingInsight,
   leadFunnelInsight,
   leakNote,
@@ -94,23 +94,30 @@ export function PipelinePage() {
   const noDeal = leads - num(funnel.data?.[1]?.reached);
   const outcomeBy = f.outcome_by ?? "lead_source";
   const outcomeGroups = groupRows(outcomes.data ?? [], outcomeBy);
-  const channelI = channelInsight(
-    outcomeGroups,
-    f.period,
-    DIMENSIONS[outcomeBy].plural,
-  );
+  const outcomeI = outcomeInsight(outcomeGroups, f.period, f.outcome_focus);
+  const focused = outcomeI.highlight?.grp;
   const winI = winRateInsight(winBySource.data ?? []);
   const monthI = pipelineByMonthInsight(monthRows, SOURCES, f.period);
   const repI = repInsight(reps.data ?? []);
   const stageI = stageDaysInsight(stageDays.data ?? []);
-  // Groups without their own hue (reps, industries) show the highlighted one in blue.
+  // The focused group keeps its colour (blue if it has none); every other band fades back.
   const flow = buildOutcomeFlow(
-    outcomeGroups.map((r) =>
-      r.color === "var(--chart-neutral-bar)" &&
-      r.grp === channelI.highlight?.grp
+    outcomeGroups.map((r) => {
+      if (focused === undefined) return r;
+      if (r.grp !== focused)
+        return {
+          ...r,
+          color:
+            "color-mix(in oklab, var(--chart-neutral-bar) 35%, transparent)",
+        };
+      return r.color === "var(--chart-neutral-bar)"
         ? { ...r, color: "var(--chart-1)" }
-        : r,
-    ),
+        : r;
+    }),
+  );
+  // Cards in order of wins, so the best performer comes first.
+  const outcomeCards = [...outcomeGroups].sort(
+    (a, b) => num(b.won) - num(a.won) || num(b.won_usd) - num(a.won_usd),
   );
 
   /** Funnel tooltip for step i: 0 = leads, then each stage (rank i). */
@@ -364,55 +371,70 @@ export function PipelinePage() {
       <section className="mt-4">
         <ChartCard
           name="Deal outcomes"
-          insight={channelI.title}
-          note={`Deals created, ${periodLabel.toLowerCase()}, by ${DIMENSIONS[outcomeBy].label.toLowerCase()} and where they ended up.${leakNote(channelI.highlight, GATES)}`}
+          insight={outcomeI.title}
+          note={`Deals created, ${periodLabel.toLowerCase()}, by ${DIMENSIONS[outcomeBy].label.toLowerCase()} and where they ended up. Click a card below to focus on it.${leakNote(outcomeI.highlight, GATES)}`}
           query={outcomes}
           isEmpty={outcomes.data !== undefined && !outcomeGroups.length}
           actions={
             <GroupBy
               name="Deal outcomes"
               value={outcomeBy}
-              onChange={(d) => set({ outcome_by: d })}
+              onChange={(d) => set({ outcome_by: d, outcome_focus: undefined })}
             />
           }
         >
           <Sankey
-            key={outcomeBy}
+            key={`${outcomeBy}:${String(focused)}`}
             nodes={flow.nodes}
             links={flow.links}
             ariaLabel="Deals by group and outcome: won, still open or lost"
             aspectRatio={outcomeGroups.length > 6 ? "16 / 10" : "16 / 6"}
           />
-          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-            {outcomeGroups.map((r) => (
-              <div
-                key={String(r.grp)}
-                className={
-                  r.grp === channelI.highlight?.grp
-                    ? "rounded-lg border border-brand-accent/60 bg-foreground/5 px-3 py-2"
-                    : "rounded-lg border px-3 py-2"
-                }
-              >
-                <dt className="flex items-center gap-1.5 text-xs text-ink-secondary">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ background: String(r.color) }}
-                  />
-                  {String(r.label)}
-                </dt>
-                <dd className="mt-1 text-sm">
-                  <span className="font-medium">{percent(r.won_share, 0)}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    won of {String(r.deals)}
-                  </span>
-                </dd>
-                <dd className="text-xs text-muted-foreground">
-                  {currency(r.open_usd)} still open
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <ul
+            className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+            aria-label="Focus on a group"
+          >
+            {outcomeCards.map((r) => {
+              const on = r.grp === focused;
+              return (
+                <li key={String(r.grp)} className="flex">
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => set({ outcome_focus: String(r.grp) })}
+                    className={`w-full rounded-lg border px-3 py-2 text-left outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring ${
+                      on
+                        ? "border-brand-accent bg-foreground/10"
+                        : "hover:bg-foreground/5"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            on && r.color === "var(--chart-neutral-bar)"
+                              ? "var(--chart-1)"
+                              : String(r.color),
+                        }}
+                      />
+                      {String(r.label)}
+                    </span>
+                    <span className="mt-1 block text-sm">
+                      <span className="font-medium">{count(r.won)}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        won of {count(r.deals)} · {percent(r.won_share, 0)}
+                      </span>
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {currency(r.open_usd)} still open
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </ChartCard>
       </section>
 

@@ -26,11 +26,13 @@ export interface Filters {
   /** Chart view choices (how a card groups its rows): kept in the URL, never sent to cards. */
   velocity_by?: Dimension;
   outcome_by?: Dimension;
+  /** The group the reader focused on the outcomes chart (its key in that grouping). */
+  outcome_focus?: string;
 }
 const VIEW_KEYS = ["velocity_by", "outcome_by"] as const;
 export type FilterKey = Exclude<
   keyof Filters,
-  "period" | (typeof VIEW_KEYS)[number]
+  "period" | "outcome_focus" | (typeof VIEW_KEYS)[number]
 >;
 const FILTER_KEYS: FilterKey[] = [
   "segment",
@@ -53,6 +55,8 @@ export function parseFilters(search: string): Filters {
     const v = q.get(k);
     if (isDimension(v)) f[k] = v;
   }
+  const focus = q.get("outcome_focus");
+  if (focus) f.outcome_focus = focus;
   return f;
 }
 
@@ -61,6 +65,7 @@ export function serializeFilters(f: Filters): string {
   if (f.period !== DEFAULT_PERIOD) q.set("period", f.period);
   for (const k of FILTER_KEYS) if (f[k]) q.set(k, f[k]!);
   for (const k of VIEW_KEYS) if (f[k]) q.set(k, f[k]!);
+  if (f.outcome_focus) q.set("outcome_focus", f.outcome_focus);
   const s = q.toString();
   return s ? `?${s}` : "";
 }

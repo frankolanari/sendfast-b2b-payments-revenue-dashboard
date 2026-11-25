@@ -85,3 +85,15 @@ describe("chart view choices", () => {
     ]);
   });
 });
+
+describe("focused group", () => {
+  it("is kept in the URL and never reaches a card", () => {
+    const f = parseFilters("?outcome_by=rep&outcome_focus=Kemi+Lawal");
+    expect(f.outcome_focus).toBe("Kemi Lawal");
+    expect(parseFilters(serializeFilters(f))).toEqual(f);
+    expect(cardParams("deal_outcomes", f)).toEqual({
+      date_from: "2025-11-01",
+      date_to: "2026-10-31",
+    });
+  });
+});

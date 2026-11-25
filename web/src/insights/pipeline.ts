@@ -54,59 +54,62 @@ export function winRateInsight(rows: Row[]): Insight {
   };
 }
 
+/** The best performer: most deals won, then most won value. Missing CRM values never rank. */
+export function topPerformer(groups: Row[]): Row | undefined {
+  return [...knownGroups(groups)]
+    .filter((r) => num(r.won) > 0)
+    .sort(
+      (a, b) => num(b.won) - num(a.won) || num(b.won_usd) - num(a.won_usd),
+    )[0];
+}
+
 /**
- * The group -> outcome Sankey. Rows come from lib/groups (label, inline). Highlights the
- * weakest group only when the comparison is fair.
+ * The group -> outcome Sankey (rows from lib/groups). By default it focuses on the best
+ * performer; a group the reader picks (`focus`) takes its place.
  */
-export function channelInsight(
+export function outcomeInsight(
   groups: Row[],
   period: PeriodKey,
-  noun = "channels",
+  focus?: string,
 ): Insight {
   const t = totals(groups);
   if (!t.deals) return { title: `No deals were created ${inPeriod[period]}` };
-  if (groups.length === 1) {
-    const r = groups[0];
+  const picked =
+    groups.find((r) => r.grp === focus) ??
+    (groups.length === 1 ? groups[0] : undefined);
+  if (picked) {
+    const value = num(picked.won_usd)
+      ? `, worth ${currency(picked.won_usd)}`
+      : "";
     return {
-      title: `${String(r.label)}: ${num(r.won)} of ${plural(num(r.deals), "deal")} won so far, ${currency(r.open_usd)} still open`,
+      title: `${String(picked.label)}: ${num(picked.won)} of ${plural(num(picked.deals), "deal")} won (${percent(num(picked.won) / num(picked.deals), 0)})${value}, ${currency(picked.open_usd)} still open`,
+      highlight: picked,
     };
   }
-  if (t.open / t.deals > STILL_OPEN_SHARE)
-    return {
-      title: `${num(t.open)} of ${plural(t.deals, "deal")} created ${inPeriod[period]} are still open, worth ${currency(t.openUsd)}`,
-    };
-  const sized = knownGroups(groups).filter((r) => num(r.deals) >= MIN_SAMPLE);
-  if (sized.length < 2)
-    return {
-      title: `Too few deals to compare ${noun} (under ${MIN_SAMPLE} each)`,
-    };
-  const worst = pickBy(sized, "won_share", "min")!;
-  const richest = pickBy(sized, "open_usd", "max")!;
-  const lead = `${String(worst.label)} deals win least (${percent(worst.won_share, 0)})`;
-  if (num(richest.open_usd) <= 0)
-    return {
-      title: `${lead}; no deals in this view are still open`,
-      highlight: worst,
-    };
-  const money = currency(richest.open_usd);
+  const best = topPerformer(groups);
+  if (!best)
+    return { title: `No deals created ${inPeriod[period]} have been won yet` };
+  const tied =
+    knownGroups(groups).filter((r) => num(r.won) === num(best.won)).length > 1;
+  const open =
+    t.open / t.deals > STILL_OPEN_SHARE
+      ? `; ${percent(t.open / t.deals, 0)} of all deals are still open`
+      : "";
   return {
-    title:
-      richest === worst
-        ? `${lead} yet hold the most open pipeline (${money})`
-        : `${lead}; ${String(richest.inline)} holds the most open pipeline (${money})`,
-    highlight: worst,
+    title: `${String(best.label)} ${tied ? "ties for the most wins" : "wins the most"}: ${num(best.won)} of ${plural(num(best.deals), "deal")}${num(best.won_usd) ? `, worth ${currency(best.won_usd)}` : ""}${open}`,
+    highlight: best,
   };
 }
 
-/** Where the weakest group's lost deals most often stopped, for the Sankey note. */
+/** Where the focused group's lost deals most often stopped, for the Sankey note. */
 export function leakNote(
-  worst: Row | undefined,
+  group: Row | undefined,
   stages: readonly string[],
 ): string {
-  if (!worst || num(worst.lost) < 3) return "";
-  const stage = stages[num(worst.lost_stage_rank) - 1];
+  if (!group || num(group.lost) < 3) return "";
+  const stage = stages[num(group.lost_stage_rank) - 1];
   return stage
-    ? ` ${String(worst.label)}: lost deals most often stopped at ${stage.toLowerCase()}.`
+    ? ` ${String(group.label)}: lost deals most often stopped at ${stage.toLowerCase()}.`
     : "";
 }
 

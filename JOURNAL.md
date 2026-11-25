@@ -346,6 +346,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: return all groupings in one card and switch client-side; keep view choices in the URL; never cycle colours past the palette. Specific: the five dimensions.
 **Tags:** #linkedin #x #article #skill
 
+## 2026-11-25 · Stage 7 · Owner: focus the best performer, and let a click change the focus
+**Type:** decision
+**What happened:** Deal outcomes highlighted the weakest group. The owner asked for the best performer by deals won as the default, and for the summary cards to act as a selector: click one, it takes the highlight and everything else fades back. Built: default focus = most deals won (value breaks ties, missing CRM values never rank); a click focuses a group, the finding and the "where lost deals stopped" note follow it, and the choice is in the URL. Changing the grouping or a filter that removes the group falls back to the default.
+**Why it matters:** The default view should say who is doing well; the reader chooses who to inspect.
+**Generic vs specific (#skill):** generic: summary cards double as the chart's selector (buttons with pressed state), with the selection in the URL. Specific: "best" = deals won.
+**Tags:** #article #skill
+
 ---
 
 ## Owner notes

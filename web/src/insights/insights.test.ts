@@ -1,7 +1,7 @@
 /** The audit's failures (2026-11-25), each now a test. */
 import { describe, expect, it } from "vitest";
 import {
-  channelInsight,
+  outcomeInsight,
   pipelineByMonthInsight,
   repInsight,
   winRateInsight,
@@ -37,11 +37,11 @@ const outcome = (
 
 describe("never compare one thing with itself", () => {
   it("one source on the Sankey: describes it", () => {
-    const t = channelInsight(
+    const t = outcomeInsight(
       [outcome("partner", 116, 23, 39, 5_109_600)],
       "t12",
     ).title;
-    expect(t).toBe("Partner: 23 of 116 deals won so far, $5.1M still open");
+    expect(t).toBe("Partner: 23 of 116 deals won (20%), $5.1M still open");
     expect(t).not.toMatch(/least|most/);
   });
   it("one source on pipeline by month", () => {
@@ -82,8 +82,8 @@ describe("recent periods and empty numbers", () => {
       outcome("inbound", 50, 20, 0, 0),
       outcome("partner", 40, 10, 0, 0),
     ];
-    expect(channelInsight(rows, "y2025").title).toBe(
-      "Partner deals win least (25%); no deals in this view are still open",
+    expect(outcomeInsight(rows, "y2025").title).toBe(
+      "Inbound wins the most: 20 of 50 deals",
     );
   });
   it("no past-due problem is not a problem", () => {
@@ -253,5 +253,49 @@ describe("lead funnel with leakage, ageing, velocity", () => {
     expect(velocityInsight({ ...total, closed_deals: 3 }).title).toMatch(
       /Too few/,
     );
+  });
+});
+
+describe("deal outcomes focus", () => {
+  const g = (
+    grp: string,
+    deals: number,
+    won: number,
+    won_usd = won * 1000,
+    still_open = 0,
+  ) => ({
+    grp,
+    label: grp,
+    inline: grp,
+    deals,
+    won,
+    won_usd,
+    still_open,
+    open_usd: still_open * 1000,
+  });
+  const rows = [
+    g("Ada", 48, 20),
+    g("Kemi", 73, 25, 2_000_000),
+    g("James", 34, 2, 400_000, 20),
+    g("unknown", 90, 60),
+  ];
+  it("focuses the best performer by deals won, never a missing CRM value", () => {
+    const i = outcomeInsight(rows, "t12");
+    expect(i.highlight?.grp).toBe("Kemi");
+    expect(i.title).toBe("Kemi wins the most: 25 of 73 deals, worth $2M");
+  });
+  it("focuses the group the reader picked, and falls back when it isn't in view", () => {
+    expect(outcomeInsight(rows, "t12", "James").title).toBe(
+      "James: 2 of 34 deals won (6%), worth $400K, $20K still open",
+    );
+    expect(outcomeInsight(rows, "t12", "Nobody").highlight?.grp).toBe("Kemi");
+  });
+  it("breaks ties on value, says so, and says when nothing is won", () => {
+    const tie = outcomeInsight([g("A", 20, 5, 10), g("B", 20, 5, 20)], "t12");
+    expect(tie.highlight?.grp).toBe("B");
+    expect(tie.title).toMatch(/ties for the most wins/);
+    expect(
+      outcomeInsight([g("A", 20, 0), g("B", 20, 0)], "sep2026").title,
+    ).toBe("No deals created in Sep 2026 have been won yet");
   });
 });
