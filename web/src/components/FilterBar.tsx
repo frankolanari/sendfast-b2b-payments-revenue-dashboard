@@ -1,4 +1,5 @@
 import { parameterContract } from "@/api/cards.generated";
+import { SNAPSHOT } from "@/api/client";
 import { useCard } from "@/api/useCard";
 import { cap } from "@/insights/common";
 import {
@@ -14,12 +15,14 @@ function Select({
   value,
   options,
   onChange,
+  disabled,
 }: {
   name: FilterKey;
   label: string;
   value?: string;
   options: { value: string; label: string }[];
   onChange: (v: string | undefined) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex items-center gap-2 text-sm">
@@ -27,8 +30,9 @@ function Select({
       <select
         name={name}
         value={value ?? ""}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent [&>option]:bg-card"
+        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 dark:bg-transparent [&>option]:bg-card"
       >
         <option value="">All</option>
         {options.map((o) => (
@@ -106,6 +110,8 @@ export function FilterBar({ show }: { show: FilterKey[] }) {
           value={f[k]}
           options={options[k]}
           onChange={(v) => set({ [k]: v })}
+          // The static demo holds one filter at a time.
+          disabled={SNAPSHOT && !f[k] && show.some((other) => f[other])}
         />
       ))}
       {show
@@ -125,6 +131,11 @@ export function FilterBar({ show }: { show: FilterKey[] }) {
             </button>
           );
         })}
+      {SNAPSHOT && show.length > 0 && (
+        <span className="text-xs text-muted-foreground">
+          Static demo: one filter at a time
+        </span>
+      )}
       {active && (
         <button
           type="button"

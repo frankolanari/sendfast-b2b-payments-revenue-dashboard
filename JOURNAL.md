@@ -353,6 +353,15 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: summary cards double as the chart's selector (buttons with pressed state), with the selection in the URL. Specific: "best" = deals won.
 **Tags:** #article #skill
 
+## 2026-11-25 · Stage 7 · Interactivity, the last two pages, and the static demo
+**Type:** milestone
+**What happened:** The owner asked for Power BI-style interactivity, then "execute until you're done". Built: cross-filtering (click a lead source, rep, segment or corridor; a chip clears it), a deals drill-through, account names that open Account 360, and a data view with CSV download on every chart. Added Account health & risk (7 charts, the owner-approved list) and Account 360 (profile, revenue, volume, health, a dated timeline from lead to risk, deals). Static demo mode: an exporter runs every card for every period and single filter through Metabase with the view-only key; the site reads those files and holds one filter at a time. Playwright covers the four pages and the interactions; Lighthouse accessibility is checked per page; CI gained `web` and `e2e` jobs.
+**Problem -> fix:** (1) The chart kit has no click events: our wrappers remember the hovered datum and treat a click as "filter by it". (2) Smoothed line charts drew dips either side of the corridor spike that were not in the data; lines are now straight. (3) The snapshot export takes ~10 minutes at full scale (4,969 card runs, 4.1 MB), ~4 at the CI scale.
+**Numbers:** all four pages score 100 on Lighthouse accessibility; 8 end-to-end tests with zero console errors; all six planted stories visible.
+**Quotable line:** "A smooth curve is a claim about data you don't have."
+**Generic vs specific (#skill):** generic: card-per-preset snapshots for a database-free demo; click-to-filter on top of a chart kit via the tooltip datum; never smooth sparse time series. Specific: the pages.
+**Tags:** #linkedin #article #case-study #video #skill
+
 ---
 
 ## Owner notes

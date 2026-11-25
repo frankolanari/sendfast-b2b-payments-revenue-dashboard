@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { cards, type CardSlug } from "@/api/cards.generated";
-import type { CardParams } from "@/api/client";
+import { SNAPSHOT, type CardParams } from "@/api/client";
 import { isDimension, type Dimension } from "@/lib/groups";
 
 export const PERIODS = {
@@ -113,6 +113,12 @@ export function useFilters(): [Filters, (next: Partial<Filters>) => void] {
   const filters = parseFilters(search);
   const set = (next: Partial<Filters>) => {
     const merged = { ...filters, ...next };
+    // The static demo holds one filter at a time: the newest choice replaces the others.
+    if (SNAPSHOT) {
+      const chosen = FILTER_KEYS.find((k) => next[k]);
+      if (chosen)
+        for (const k of FILTER_KEYS) if (k !== chosen) delete merged[k];
+    }
     for (const k of FILTER_KEYS) if (!merged[k]) delete merged[k];
     window.history.replaceState(
       null,

@@ -1,5 +1,6 @@
 import { Download, Table2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { SNAPSHOT } from "@/api/client";
 import { toCsv } from "@/lib/table";
 import { DataTable } from "./DataTable";
 import type { UseQueryResult } from "@tanstack/react-query";
@@ -39,7 +40,10 @@ export function ChartCard({
   insight: ReactNode;
   /** What is measured and how to read it. */
   note?: ReactNode;
-  query: Pick<UseQueryResult<unknown[]>, "isPending" | "isError" | "data">;
+  query: Pick<
+    UseQueryResult<unknown[]>,
+    "isPending" | "isError" | "data" | "error"
+  >;
   isEmpty?: boolean;
   className?: string;
   /** Active filters this chart can't apply (state/filters ignoredFilters). */
@@ -113,7 +117,9 @@ export function ChartCard({
           />
         ) : query.isError ? (
           <p className="py-16 text-center text-sm text-destructive">
-            This chart couldn't load. Try again later.
+            {SNAPSHOT && query.error instanceof Error
+              ? query.error.message
+              : "This chart couldn't load. Try again later."}
           </p>
         ) : empty ? (
           <p className="py-16 text-center text-sm text-muted-foreground">

@@ -15,7 +15,7 @@ WAIT_TIMEOUT ?= 300
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
-        dev db-roles dbt-docs gate-4 gate-5 gate-6 metabase-reset metabase-rerun golden-3way card-registry card-registry-check \
+        dev db-roles dbt-docs gate-4 gate-5 gate-6 gate-7 web-check e2e lighthouse metabase-reset metabase-rerun golden-3way card-registry card-registry-check \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -141,8 +141,20 @@ dev: env ## Live preview: proxy on :8787 + web on :5173, hot reload (needs make 
 	pnpm --parallel --filter @sendfast/proxy --filter @sendfast/web run dev
 
 web: dev ## Alias for make dev
-snapshot: ## Export static snapshot JSON (Stage 7)
-	@echo "Not built yet: Stage 7." && exit 1
+snapshot: env ## Export the static snapshot from Metabase and build the static demo (web/dist-snapshot)
+	uv run python scripts/metabase_export_snapshot.py
+	pnpm --filter @sendfast/web run build:snapshot
+
+web-check: card-registry-check ## Web and proxy: typecheck, unit tests, production build
+	pnpm --filter @sendfast/web --filter @sendfast/proxy run typecheck
+	pnpm --filter @sendfast/web --filter @sendfast/proxy run test
+	pnpm --filter @sendfast/web run build
+
+e2e: ## Playwright on all four pages in snapshot mode (needs make snapshot first)
+	pnpm --filter @sendfast/web run e2e
+
+lighthouse: ## Lighthouse accessibility >= 90 on each page (needs make snapshot first)
+	pnpm --filter @sendfast/web run lighthouse
 demo: up generate compile-maps transform metabase-bootstrap golden snapshot ## Everything end to end
 
 # ── Gates (PLAN.md Section 4A); cumulative ───────────────────────────────
@@ -167,4 +179,7 @@ gate-5: gate-4 golden ## G5: every metric in metrics.yml matches the answer key 
 gate-6: gate-5 metabase-reset metabase-bootstrap metabase-rerun golden-3way ## G6: bootstrap from empty < 3 min, rerun changes nothing, three-way golden (+ G0-5)
 	@echo "Gate 6 passed (automated part). Owner sign-off: cross-filtering screenshots in docs/evidence/gate-6/."
 
-gates: gate-6 ## Run every gate built so far
+gate-7: gate-6 web-check snapshot e2e lighthouse ## G7: typecheck, lint, tests, build, e2e with no console errors, Lighthouse >= 90 (+ G0-6)
+	@echo "Gate 7 passed (automated part). Owner sign-off: design quality and planted stories, docs/evidence/gate-7/."
+
+gates: gate-7 ## Run every gate built so far

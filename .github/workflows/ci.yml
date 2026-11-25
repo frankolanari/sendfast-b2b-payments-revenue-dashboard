@@ -148,9 +148,68 @@ jobs:
         run: make metabase-rerun
       - name: three-way golden check (answer key vs marts vs Metabase, scale 0.1 key)
         run: make golden-3way SCALE=0.1
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: export the static snapshot (every card, every preset)
+        run: make snapshot
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snapshot
+          path: web/public/snapshot
+          if-no-files-found: error
       - name: stop the stack
         if: always()
         run: make down
+
+  web:
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: uv sync --locked
+      - run: pnpm install --frozen-lockfile
+      - name: card registry current; web and proxy typecheck, unit tests, build
+        run: make web-check
+
+  e2e:
+    needs: [metabase, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: snapshot
+          path: web/public/snapshot
+      - run: pnpm --filter @sendfast/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @sendfast/web run build:snapshot
+      - name: Playwright, all four pages, no console errors
+        run: make e2e
+      - name: Lighthouse accessibility >= 90 on each page
+        run: make lighthouse
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screenshots
+          path: web/test-results/screens
 
   compiled-up-to-date:
     needs: unit
