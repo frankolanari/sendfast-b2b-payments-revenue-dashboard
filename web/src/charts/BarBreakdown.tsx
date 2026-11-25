@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/charts";
 import type { Row } from "@/api/useCard";
 import { toNumber } from "@/lib/format";
+import { TooltipBody } from "./TooltipBody";
 
 export interface Series {
   key: string;
@@ -98,24 +99,28 @@ export function BarBreakdown({
       {horizontal ? <BarYAxis showAllLabels /> : <BarXAxis showAllLabels />}
       {!horizontal && <BarYAxis numTicks={4} formatValue={(v) => format(v)} />}
       <ChartTooltip
-        rows={(p) =>
-          stacked
-            ? bars
-                .filter((b) => (toNumber(p[b.key]) ?? 0) !== 0)
+        content={({ point }) =>
+          stacked ? (
+            <TooltipBody
+              title={String(point.__cat)}
+              total={format(total(point))}
+              // Top of the stack first, as the eye reads it; zero series left out.
+              rows={[...bars]
+                .reverse()
+                .filter((b) => (toNumber(point[b.key]) ?? 0) !== 0)
                 .map((b) => ({
                   color: b.color,
                   label: b.label,
-                  value: format(p[b.key]),
-                }))
-            : [
-                {
-                  color: p.__hl
-                    ? "var(--brand-accent)"
-                    : "var(--chart-neutral-bar)",
-                  label: String(p.__cat),
-                  value: format(total(p)),
-                },
-              ]
+                  value: format(point[b.key]),
+                }))}
+            />
+          ) : (
+            <TooltipBody
+              title={String(point.__cat)}
+              total={format(total(point))}
+              rows={[]}
+            />
+          )
         }
       />
     </BarChart>
