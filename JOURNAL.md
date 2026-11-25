@@ -367,6 +367,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **What happened:** The first full `make gate-7` failed in `web-check`: Vitest's default pattern also matched `web/e2e/pages.spec.ts` and Playwright refused to be called from it. Unit tests had passed only because they were last run before the e2e file existed. Fix: Vitest includes `src/**/*.test.ts` only; the browser tests run through Playwright. Whole gate rerun.
 **Tags:** #skill
 
+## 2026-11-25 · Stage 7 · Gate 7, loops 2 and 3 attempts: the bootstrap's 3-minute limit, on a starved laptop
+**Type:** problem-fix
+**What happened:** Two full local `make gate-7` runs failed at the Metabase bootstrap time limit (180 s): 230 s, then 209 s. The same step took 23-51 s earlier the same day. First run: the Mac went into idle sleep during the bootstrap (pmset log: sleep 13:09 UTC, wake 13:38; matching 30-minute gap in the Metabase log); rerun with `caffeinate`. Second run, awake: Metabase startup took 2.9 minutes instead of about 40 s, one dashboard save 12.8 s, with swap at 16.2 of 17.4 GB, load average 15 on 8 cores, and about 14 containers from other projects sharing Docker's 5.8 GB. The limit was not changed. The agent pushed the branch so CI (a clean machine) could check the same gate, and asked the owner before touching other projects' containers.
+**Why it matters:** A timing gate measures the machine too. The honest fix is the environment, not a bigger number.
+**Generic vs specific (#skill):** generic: before blaming code for a timing failure, check sleep logs, swap and neighbouring containers; never raise a gate's limit to pass it. Specific: Metabase on a laptop.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
