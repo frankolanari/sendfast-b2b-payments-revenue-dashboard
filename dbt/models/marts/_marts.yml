@@ -78,12 +78,6 @@ models:
           - not_null
           - accepted_values:
               arguments: { values: [1, 2, 3, 4, 5], quote: false }
-      - name: last_open_stage_rank
-        description: The last open stage reached (1-4, dim_stages), where a deal stalled or left from.
-        data_tests:
-          - not_null
-          - accepted_values:
-              arguments: { values: [1, 2, 3, 4], quote: false }
       - name: outcome
         description: won, lost, or open as of 2026-10-31.
         data_tests:

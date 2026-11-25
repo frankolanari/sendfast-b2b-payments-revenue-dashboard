@@ -1,6 +1,7 @@
 import { useCard, type Row } from "@/api/useCard";
 import { BarBreakdown } from "@/charts/BarBreakdown";
 import { ChartCard } from "@/charts/ChartCard";
+import { buildOutcomeFlow, GATES } from "@/charts/flows";
 import { Funnel } from "@/charts/Funnel";
 import { KpiTile } from "@/charts/KpiTile";
 import { Sankey } from "@/charts/Sankey";
@@ -39,23 +40,57 @@ export function PipelinePage() {
   const periodLabel = PERIODS[f.period].label;
 
   const funnel = useCard("stage_funnel", p("stage_funnel"));
-  const winBySource = useCard("win_rate_by_source", p("win_rate_by_source"));
-  const byMonth = useCard("pipeline_by_month", p("pipeline_by_month"));
-  const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
-  const stageDays = useCard("days_in_stage", p("days_in_stage"));
-  const flow = useCard("deal_flow", p("deal_flow"));
+  const gates = useCard("deal_gates", p("deal_gates"));
   const outcomes = useCard(
     "deal_outcomes_by_source",
     p("deal_outcomes_by_source"),
   );
+  const winBySource = useCard("win_rate_by_source", p("win_rate_by_source"));
+  const byMonth = useCard("pipeline_by_month", p("pipeline_by_month"));
+  const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
+  const stageDays = useCard("days_in_stage", p("days_in_stage"));
 
-  // Insight titles, computed from the data on screen, so they stay true under any filter.
+  // Channel story: which source wins least, which holds the most money still in play, and at
+  // which gate the weakest source loses most deals. Sources with too few deals are left out.
+  const sized = known(outcomes.data).filter(
+    (r) => (toNumber(r.deals) ?? 0) >= 10,
+  );
+  const worst = by(sized, "won_share", "min");
+  const richest = by(sized, "open_usd", "max");
+  const leak = worst
+    ? by(
+        (gates.data ?? []).filter(
+          (r) => r.lead_source === worst.lead_source && r.outcome === "lost",
+        ),
+        "deals",
+        "max",
+      )
+    : undefined;
+  const leakGate = leak
+    ? GATES[(toNumber(leak.furthest_stage_rank) ?? 1) - 1]
+    : undefined;
+  const flowTitle = !worst
+    ? "How deals from each channel end up"
+    : richest && richest.lead_source === worst.lead_source
+      ? `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}) yet hold the most open pipeline (${currency(worst.open_usd)})`
+      : `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}); ${cap(richest?.lead_source).toLowerCase()} holds the most open pipeline (${currency(richest?.open_usd)})`;
+  const flowNote = leakGate
+    ? ` Most lost ${String(worst?.lead_source)} deals drop out at ${leakGate.toLowerCase()}.`
+    : "";
+  const flow = buildOutcomeFlow(
+    gates.data ?? [],
+    SOURCES,
+    cap,
+    (s) => SOURCE_COLOR[s] ?? "var(--chart-neutral-bar)",
+  );
+
   const top = funnel.data?.[0];
-  const won = funnel.data?.find((r) => r.stage === "won");
+  const wonStage = funnel.data?.find((r) => r.stage === "won");
   const funnelTitle =
-    top && won && toNumber(top.opportunities)
-      ? `${percent(toNumber(won.opportunities)! / toNumber(top.opportunities)!)} of deals created reach won`
+    top && wonStage && toNumber(top.opportunities)
+      ? `${percent(toNumber(wonStage.opportunities)! / toNumber(top.opportunities)!)} of deals created reach won`
       : "Deals by furthest stage reached";
+
   const lowestWin = by(known(winBySource.data), "win_rate", "min");
   const winTitle =
     lowestWin && known(winBySource.data).length > 1
@@ -69,30 +104,6 @@ export function PipelinePage() {
   const stageTitle = slowest
     ? `Deals wait longest in ${cap(slowest.stage).toLowerCase()}: ${days(slowest.median_days_in_stage)} at the median`
     : "Median days in stage";
-  // Channel story: which source wins least, which holds the most money still in play, and
-  // where the weakest source's lost deals stopped. Sources with too few deals are left out.
-  const sized = known(outcomes.data).filter(
-    (r) => (toNumber(r.deals) ?? 0) >= 10,
-  );
-  const worst = by(sized, "won_share", "min");
-  const richest = by(sized, "open_usd", "max");
-  const stall = worst
-    ? by(
-        (flow.data ?? []).filter(
-          (r) => r.lead_source === worst.lead_source && r.outcome === "lost",
-        ),
-        "deals",
-        "max",
-      )
-    : undefined;
-  const flowTitle = !worst
-    ? "How deals from each channel play out"
-    : richest && richest.lead_source === worst.lead_source
-      ? `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}) yet hold the most open pipeline (${currency(worst.open_usd)})`
-      : `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}); ${cap(richest?.lead_source).toLowerCase()} holds the most open pipeline (${currency(richest?.open_usd)})`;
-  const flowNote = stall
-    ? `Most lost ${String(worst?.lead_source)} deals stopped at ${String(stall.last_open_stage)}.`
-    : "";
 
   // Pipeline by month: pivot (month, source) rows into one row per month.
   const months = new Map<string, Row>();
@@ -194,35 +205,14 @@ export function PipelinePage() {
       <section className="mt-4">
         <ChartCard
           title={flowTitle}
-          subtitle={`Deals created, ${periodLabel.toLowerCase()}: lead source → last open stage reached → outcome. ${flowNote}`}
-          query={flow}
+          subtitle={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${flowNote}`}
+          query={gates}
         >
           <Sankey
-            rows={flow.data ?? []}
-            value="deals"
-            ariaLabel="Deals by lead source, last open stage reached and outcome"
-            steps={[
-              {
-                key: "lead_source",
-                order: SOURCES,
-                label: cap,
-                color: (v) => SOURCE_COLOR[v],
-              },
-              {
-                key: "last_open_stage",
-                order: ["discovery", "qualified", "proposal", "negotiation"],
-                label: cap,
-              },
-              {
-                key: "outcome",
-                order: ["won", "open", "lost"],
-                label: (v) => (v === "open" ? "Still open" : cap(v)),
-                color: (v) =>
-                  v === "won"
-                    ? "var(--brand-accent)"
-                    : "var(--chart-neutral-bar)",
-              },
-            ]}
+            nodes={flow.nodes}
+            links={flow.links}
+            ariaLabel="Deals by lead source and outcome: won, still open or lost"
+            aspectRatio="16 / 6"
           />
           <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
             {(outcomes.data ?? []).map((r) => (

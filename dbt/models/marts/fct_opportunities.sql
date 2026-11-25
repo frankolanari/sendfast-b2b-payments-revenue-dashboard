@@ -17,9 +17,7 @@ furthest as (
     -- How far each deal got: the highest funnel rank among the stages it entered.
     select
         transitions.opportunity_id,
-        max(stage_ranks.stage_rank) as furthest_stage_rank,
-        -- The last open stage it reached (won and lost are outcomes, not stages to stall in).
-        max(stage_ranks.stage_rank) filter (where stage_ranks.is_open_stage) as last_open_stage_rank
+        max(stage_ranks.stage_rank) as furthest_stage_rank
     from {{ ref('int_opportunity_stage_transitions') }} as transitions
     inner join {{ ref('dim_stages') }} as stage_ranks
         on transitions.stage = stage_ranks.stage
@@ -42,8 +40,7 @@ dated as (
         opportunities.stage,
         opportunities.is_closed,
         opportunities.is_won,
-        furthest.furthest_stage_rank,
-        furthest.last_open_stage_rank
+        furthest.furthest_stage_rank
     from opportunities
     left join furthest
         on opportunities.opportunity_id = furthest.opportunity_id
@@ -67,7 +64,6 @@ select
     is_closed,
     is_won,
     furthest_stage_rank,
-    last_open_stage_rank,
     case when is_won then 'won' when is_closed then 'lost' else 'open' end as outcome,
     close_date < created_date as has_invalid_close_date,
     case when is_closed and close_date >= created_date then close_date - created_date end as sales_cycle_days,

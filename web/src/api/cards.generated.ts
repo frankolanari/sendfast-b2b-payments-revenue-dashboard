@@ -166,8 +166,8 @@ export const cards = {
     ],
     "required": []
   },
-  "deal_flow": {
-    "name": "Deal flow by source, stage and outcome",
+  "deal_gates": {
+    "name": "Deals through the stage gates",
     "collection": "Pipeline",
     "display": "table",
     "params": [
