@@ -15,7 +15,7 @@ WAIT_TIMEOUT ?= 300
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
-        db-roles dbt-docs gate-4 gate-5 gate-6 metabase-reset metabase-rerun golden-3way \
+        dev db-roles dbt-docs gate-4 gate-5 gate-6 metabase-reset metabase-rerun golden-3way card-registry card-registry-check \
         generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
         gate-0 gates
 
@@ -121,6 +121,12 @@ metabase-reset: env ## Empty Metabase app DB, restart Metabase, wait until healt
 metabase-bootstrap: env ## Rebuild Metabase from the repo: setup, DB, collections, cards, models, measures, dashboards
 	uv run python scripts/metabase_bootstrap.py --max-seconds 180
 
+card-registry: ## Regenerate web/src/api/cards.generated.ts from metabase/ (proxy allow-list, web types)
+	uv run python scripts/export_card_registry.py
+
+card-registry-check: ## Fail if the committed card registry differs from a fresh generation
+	uv run python scripts/export_card_registry.py --check
+
 metabase-rerun: env ## Bootstrap again: must change nothing (idempotent)
 	uv run python scripts/metabase_bootstrap.py --max-seconds 180 --expect-no-changes
 golden: env ## Golden numbers: answer key vs marts, as bi_reader (SCALE must match the loaded data)
@@ -129,8 +135,12 @@ golden-3way: env ## Three-way golden check: answer key vs marts vs Metabase card
 	uv run python scripts/golden_check.py --scale $(SCALE) --metabase
 conformance: ## Aggregate-only conformance checks (Stage 8)
 	@echo "Not built yet: Stage 8." && exit 1
-web: ## React front end dev server (Stage 7)
-	@echo "Not built yet: Stage 7." && exit 1
+dev: env ## Live preview: proxy on :8787 + web on :5173, hot reload (needs make metabase-bootstrap)
+	@test -n "$$MB_API_KEY" || { echo "No MB_API_KEY: run make metabase-bootstrap"; exit 1; }
+	@echo "Open http://localhost:$${WEB_PORT:-5173}  (Ctrl-C stops both)"
+	pnpm --parallel --filter @sendfast/proxy --filter @sendfast/web run dev
+
+web: dev ## Alias for make dev
 snapshot: ## Export static snapshot JSON (Stage 7)
 	@echo "Not built yet: Stage 7." && exit 1
 demo: up generate compile-maps transform metabase-bootstrap golden snapshot ## Everything end to end
