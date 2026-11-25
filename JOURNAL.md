@@ -299,6 +299,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: an install step that needs a personal account is a human step; schedule it, write the exact command, and keep the result as source so CI never needs the account. Specific: the two libraries.
 **Tags:** #article #skill
 
+## 2026-11-25 · Stage 7 · The shadcn.io charts are in
+**Type:** milestone
+**What happened:** The owner signed in to shadcn.io and pasted the install commands; the agent ran them (pinned `shadcn@4.23.0`, not `@latest`), adding the Sankey and line charts with the same token so all eight planned types landed in one install: funnel, waterfall, Sankey, line, bar, sparkline, heatmap, ring. The kit is bklit-ui (MIT) ported onto `@tanstack/charts`: 786 source files, 5.7 MB, under `web/src/components/ui/charts/`, plus one sample per chart. New npm packages pinned exactly; all at least 7 days old. Before committing, the repo was grepped for the token: 0 files contain it, and `components.json` holds no registry credentials. All eight samples render under React 19 with zero console errors (`docs/evidence/stage-7/installed-charts-smoke.png`). The vendored kit is excluded from ESLint and prettier: we wrap it, never hand-edit it; reinstalling updates it.
+**Problem → fix:** (1) The first install sent all eight URLs as one argument: zsh doesn't word-split a variable, and the registry answered "Invalid token", which pointed at the wrong cause. A real array fixed it. (2) ESLint was told to ignore the kit, but the pre-commit hook passes files by name, and ESLint's "file ignored" warning tripped `--max-warnings=0`; the hook now excludes the path too.
+**Watch:** the bundle grew from 69 kB to 323 kB gzipped with every sample on one page; pages will load their charts lazily.
+**Tags:** #skill
+
 ---
 
 ## Owner notes

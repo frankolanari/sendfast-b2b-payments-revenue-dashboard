@@ -41,3 +41,6 @@ repos:
         entry: pnpm exec eslint --max-warnings=0
         language: system
         types_or: [javascript, jsx, ts, tsx]
+        # Vendored chart kit (shadcn.io): skipped here as in eslint.config.js, so ESLint isn't
+        # handed files it ignores (that warning would trip --max-warnings=0).
+        exclude: ^web/src/components/(ui/)?charts/

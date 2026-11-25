@@ -13,3 +13,8 @@ contract/data_dictionary.md
 dbt/models/staging/crm/
 generator/answer_keys/
 dbt/models/staging/_stg_contract__models.yml
+
+# Vendored chart kit and samples installed from shadcn.io (owner's account, 2026-11-25).
+# We wrap these behind web/src/charts/, never reformat or hand-edit them; reinstall to update.
+web/src/components/ui/charts/
+web/src/components/charts/
