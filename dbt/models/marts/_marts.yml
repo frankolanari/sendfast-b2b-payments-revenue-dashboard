@@ -186,6 +186,32 @@ models:
           - accepted_values:
               arguments: { values: [0, 1, 2, 3, 4, 5], quote: false }
 
+  - name: fct_account_timeline
+    description: Dated events per account, lead to risk, for Account 360.
+    columns:
+      - name: account_id
+        data_tests: [not_null]
+      - name: event_date
+        data_tests: [not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                {
+                  values:
+                    [
+                      lead,
+                      deal,
+                      won,
+                      lost,
+                      live,
+                      first_payment,
+                      pricing,
+                      risk,
+                      churn,
+                    ],
+                }
+
   - name: fct_account_health_monthly
     data_tests:
       - unique_combination_of_columns:

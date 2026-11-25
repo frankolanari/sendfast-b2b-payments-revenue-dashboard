@@ -23,10 +23,13 @@ import {
 } from "@/insights/pipeline";
 import { count, currency, days, month, percent } from "@/lib/format";
 import { DIMENSIONS, groupRows } from "@/lib/groups";
+import { DataTable } from "@/charts/DataTable";
+import { AccountLink } from "@/components/AccountLink";
 import {
   cardParams,
   ignoredFilters,
   PERIODS,
+  useCrossFilter,
   useFilters,
 } from "@/state/filters";
 
@@ -53,6 +56,17 @@ export function PipelinePage() {
   const byMonth = useCard("pipeline_by_month", p("pipeline_by_month"));
   const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
   const stageDays = useCard("days_in_stage", p("days_in_stage"));
+  const deals = useCard("deals_list", p("deals_list"));
+  const repList = useCard("filter_reps", {});
+  const cross = useCrossFilter();
+  /** Filter the page by a group-by row, where a page filter exists for that grouping. */
+  const crossGroup = (dimension: string, key: unknown) => {
+    if (dimension === "segment" && key !== "unknown") cross("segment", key);
+    if (dimension === "lead_source") cross("lead_source", key);
+    const rep =
+      dimension === "rep" && repList.data?.find((r) => r.rep_name === key);
+    if (rep) cross("owner_id", rep.rep_id);
+  };
 
   // Pipeline by month: pivot (month, source) rows into one row per month, keeping deal counts.
   const months = new Map<string, Row>();
@@ -364,6 +378,11 @@ export function PipelinePage() {
             rows={velocityGroups}
             groupLabel={DIMENSIONS[velocityBy].label}
             highlight={velocityI.highlight?.grp}
+            onSelect={
+              ["segment", "lead_source", "rep"].includes(velocityBy)
+                ? (r) => crossGroup(velocityBy, r.grp)
+                : undefined
+            }
           />
         </ChartCard>
       </section>
@@ -388,6 +407,12 @@ export function PipelinePage() {
             nodes={flow.nodes}
             links={flow.links}
             ariaLabel="Deals by group and outcome: won, still open or lost"
+            onSelect={(name) =>
+              crossGroup(
+                outcomeBy,
+                outcomeGroups.find((r) => r.label === name)?.grp,
+              )
+            }
             aspectRatio={outcomeGroups.length > 6 ? "16 / 10" : "16 / 6"}
           />
           <ul
@@ -500,6 +525,7 @@ export function PipelinePage() {
             format={(v) => percent(v)}
             highlight={(r) => r.lead_source === winI.highlight?.lead_source}
             ariaLabel="Win rate by lead source"
+            onSelect={(r) => cross("lead_source", r.lead_source)}
             details={(r) => [
               {
                 label: "Won",
@@ -550,6 +576,7 @@ export function PipelinePage() {
             horizontal
             aspectRatio="16 / 6"
             ariaLabel="Open pipeline by rep"
+            onSelect={(r) => cross("owner_id", r.owner_id)}
             details={(r) => [
               { label: "Open deals", value: count(r.deals) },
               {
@@ -557,6 +584,42 @@ export function PipelinePage() {
                 value: `${count(r.past_due_deals)} · ${currency(r.past_due_pipeline_usd)}`,
               },
               { label: "Past-due share", value: percent(r.past_due_share) },
+            ]}
+          />
+        </ChartCard>
+      </section>
+
+      <section className="mt-4">
+        <ChartCard
+          name="Deals"
+          insight={
+            (deals.data?.length ?? 0) >= 100
+              ? "The 100 largest deals in this view"
+              : `${count(deals.data?.length ?? 0)} deals in this view, largest first`
+          }
+          note={`The deals behind the charts: created ${periodLabel.toLowerCase()}, matching your filters. Open an account for its full story.`}
+          query={deals}
+        >
+          <DataTable
+            rows={deals.data ?? []}
+            rowKey="opportunity_id"
+            caption="Deals matching the filters"
+            columns={[
+              {
+                key: "account_name",
+                label: "Account",
+                render: (r) => (
+                  <AccountLink id={r.account_id} name={r.account_name} />
+                ),
+              },
+              { key: "rep_name", label: "Rep" },
+              { key: "segment" },
+              { key: "lead_source" },
+              { key: "stage" },
+              { key: "amount_usd" },
+              { key: "created_date" },
+              { key: "close_date" },
+              { key: "is_past_due", label: "Past due" },
             ]}
           />
         </ChartCard>

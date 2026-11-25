@@ -99,6 +99,17 @@ export const cards = {
       "account_id"
     ]
   },
+  "account_timeline": {
+    "name": "Account timeline",
+    "collection": "Accounts",
+    "display": "table",
+    "params": [
+      "account_id"
+    ],
+    "required": [
+      "account_id"
+    ]
+  },
   "account_volume": {
     "name": "Account volume by corridor and month",
     "collection": "Accounts",
@@ -164,6 +175,19 @@ export const cards = {
     ],
     "required": []
   },
+  "corridor_rail_failures": {
+    "name": "Failure rate by corridor and rail",
+    "collection": "Risk",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "corridor",
+      "owner_id"
+    ],
+    "required": []
+  },
   "days_in_stage": {
     "name": "Median days in stage",
     "collection": "Pipeline",
@@ -190,10 +214,36 @@ export const cards = {
     ],
     "required": []
   },
+  "deals_list": {
+    "name": "Deals behind the numbers",
+    "collection": "Pipeline",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
   "dispute_rate_by_month": {
     "name": "Dispute and return rate by month",
     "collection": "Risk",
     "display": "line",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "corridor",
+      "owner_id"
+    ],
+    "required": []
+  },
+  "dispute_return_rate": {
+    "name": "Dispute and return rate",
+    "collection": "Risk",
+    "display": "scalar",
     "params": [
       "date_from",
       "date_to",
@@ -414,6 +464,19 @@ export const cards = {
     "name": "Revenue at risk (USD)",
     "collection": "Risk",
     "display": "scalar",
+    "params": [
+      "date_to",
+      "segment",
+      "owner_id"
+    ],
+    "required": [
+      "date_to"
+    ]
+  },
+  "revenue_at_risk_by_rep": {
+    "name": "Revenue at risk by rep",
+    "collection": "Risk",
+    "display": "row",
     "params": [
       "date_to",
       "segment",

@@ -3,14 +3,19 @@
 -- display: table
 -- params: [date_to, segment, owner_id]
 -- required: [date_to]
--- description: Accounts at risk in the month of the To date. Click an account to open Account 360.
+-- description: Accounts at risk in the month of the To date, with why. Click an account to open Account 360.
 select
     h.account_id,
     a.name as account_name,
     a.segment,
     r.name as rep_name,
+    a.owner_id,
+    h.risk_reason,
+    h.volume_usd,
+    h.avg_volume_prev_3m_usd,
     h.volume_trend,
     h.failure_rate,
+    h.txn_count,
     h.revenue_at_risk_usd
 from analytics.fct_account_health_monthly as h
 inner join analytics.dim_accounts as a on h.account_id = a.account_id

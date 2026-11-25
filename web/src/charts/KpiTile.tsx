@@ -11,6 +11,7 @@ export function KpiTile({
   format,
   note,
   ignores,
+  pick,
 }: {
   slug: CardSlug;
   params: CardParams;
@@ -19,6 +20,8 @@ export function KpiTile({
   format: (v: unknown) => string;
   note?: string;
   ignores?: string[];
+  /** Choose the value from the card's rows (default: the first row's column). */
+  pick?: (rows: Record<string, unknown>[]) => unknown;
 }) {
   const q = useCard(slug, params);
   return (
@@ -34,7 +37,7 @@ export function KpiTile({
         ) : q.isError ? (
           <span className="text-base text-destructive">Couldn't load</span>
         ) : (
-          format(q.data[0]?.[column])
+          format(pick ? pick(q.data) : q.data[0]?.[column])
         )}
       </div>
       {note && <div className="mt-1 text-xs text-muted-foreground">{note}</div>}

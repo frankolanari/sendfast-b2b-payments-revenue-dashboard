@@ -1,6 +1,21 @@
-import type { ReactNode } from "react";
+import { Download, Table2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { toCsv } from "@/lib/table";
+import { DataTable } from "./DataTable";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+
+function downloadCsv(name: string, rows: Record<string, unknown>[]) {
+  const url = URL.createObjectURL(
+    new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" }),
+  );
+  const a = Object.assign(document.createElement("a"), {
+    href: url,
+    download: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`,
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /**
  * The card every chart sits in, read top to bottom (owner, 2026-11-25): a short name that is
@@ -33,6 +48,8 @@ export function ChartCard({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const [showData, setShowData] = useState(false);
+  const rows = (query.data ?? []) as Record<string, unknown>[];
   const empty =
     isEmpty ?? (query.data !== undefined && query.data.length === 0);
   return (
@@ -43,7 +60,32 @@ export function ChartCard({
       )}
     >
       <header className="mb-4">
-        <h2 className="font-display text-xl tracking-tight">{name}</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-display text-xl tracking-tight">{name}</h2>
+          {rows.length > 0 && (
+            <div className="flex shrink-0 gap-1">
+              <button
+                type="button"
+                aria-pressed={showData}
+                aria-label={`${showData ? "Show chart" : "Show data"}: ${name}`}
+                onClick={() => setShowData((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-ink-secondary hover:bg-foreground/10 hover:text-foreground aria-pressed:bg-foreground/10"
+              >
+                <Table2 className="size-3.5" aria-hidden />
+                {showData ? "Chart" : "Data"}
+              </button>
+              <button
+                type="button"
+                aria-label={`Download ${name} as CSV`}
+                title="Download CSV"
+                onClick={() => downloadCsv(name, rows)}
+                className="grid size-7 place-items-center rounded-lg text-ink-secondary hover:bg-foreground/10 hover:text-foreground"
+              >
+                <Download className="size-3.5" aria-hidden />
+              </button>
+            </div>
+          )}
+        </div>
         {query.isPending ? (
           <span
             className="mt-1.5 block h-4 w-72 animate-pulse rounded bg-muted"
@@ -77,6 +119,8 @@ export function ChartCard({
           <p className="py-16 text-center text-sm text-muted-foreground">
             No data for these filters.
           </p>
+        ) : showData ? (
+          <DataTable rows={rows} caption={`${name}: data`} />
         ) : (
           children
         )}

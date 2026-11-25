@@ -3,7 +3,9 @@ import { Moon, Sun } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { applyTheme, saveTheme, storedTheme } from "@/design/theme";
 import type { Mode } from "@/design/tokens";
+import { AccountPage } from "@/pages/AccountPage";
 import { PipelinePage } from "@/pages/PipelinePage";
+import { RiskPage } from "@/pages/RiskPage";
 import { RevenuePage } from "@/pages/RevenuePage";
 import { navigate, usePath } from "@/state/filters";
 
@@ -79,14 +81,6 @@ function NavLink({
   );
 }
 
-function ComingNext({ title }: { title: string }) {
-  return (
-    <div className="shadow-card mt-6 rounded-xl border bg-card p-10 text-center text-ink-secondary">
-      {title} is next on the build list.
-    </div>
-  );
-}
-
 export function App() {
   const path = usePath();
   const page = PAGES.find((p) => path.startsWith(p.path)) ?? PAGES[0];
@@ -120,12 +114,14 @@ export function App() {
         <main id="main" className="mx-auto max-w-6xl px-4 pb-16 pt-8">
           <h1 className="font-display text-5xl tracking-tight">{page.title}</h1>
           <div className="mt-6">
-            {page.path === "/pipeline" ? (
-              <PipelinePage />
-            ) : page.path === "/revenue" ? (
+            {page.path === "/revenue" ? (
               <RevenuePage />
+            ) : page.path === "/risk" ? (
+              <RiskPage />
+            ) : page.path === "/accounts" ? (
+              <AccountPage />
             ) : (
-              <ComingNext title={page.title} />
+              <PipelinePage />
             )}
           </div>
         </main>

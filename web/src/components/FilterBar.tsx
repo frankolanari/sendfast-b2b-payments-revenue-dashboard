@@ -108,6 +108,23 @@ export function FilterBar({ show }: { show: FilterKey[] }) {
           onChange={(v) => set({ [k]: v })}
         />
       ))}
+      {show
+        .filter((k) => f[k])
+        .map((k) => {
+          const shown = options[k].find((o) => o.value === f[k])?.label ?? f[k];
+          return (
+            <button
+              key={`chip-${k}`}
+              type="button"
+              onClick={() => set({ [k]: undefined })}
+              aria-label={`Remove filter ${labels[k]}: ${shown}`}
+              className="flex items-center gap-1 rounded-full border border-brand-accent/70 px-2.5 py-0.5 text-xs text-foreground hover:bg-foreground/10"
+            >
+              {labels[k]}: {shown}
+              <span aria-hidden>✕</span>
+            </button>
+          );
+        })}
       {active && (
         <button
           type="button"

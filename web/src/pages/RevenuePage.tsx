@@ -20,6 +20,7 @@ import {
   cardParams,
   ignoredFilters,
   PERIODS,
+  useCrossFilter,
   useFilters,
 } from "@/state/filters";
 
@@ -65,6 +66,7 @@ function cohortDetails(r: Row) {
 
 export function RevenuePage() {
   const [f] = useFilters();
+  const cross = useCrossFilter();
   const p = (slug: CardSlug) => cardParams(slug, f);
   const skip = (...slugs: CardSlug[]) => ignoredFilters(slugs, f);
   const periodLabel = PERIODS[f.period].label;
@@ -307,6 +309,7 @@ export function RevenuePage() {
             format={(v) => currency(v)}
             highlight={(r) => r.lead_source === yearI.highlight?.lead_source}
             ariaLabel="First-year net revenue per account by lead source"
+            onSelect={(r) => cross("lead_source", r.lead_source)}
             details={(r) => [
               {
                 label: "Accounts with a full first year",

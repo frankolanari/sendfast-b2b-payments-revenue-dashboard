@@ -7,7 +7,9 @@
 select
     d.activity_month as month,
     d.corridor,
-    sum(d.failed_count) * 1.0 / nullif(sum(d.txn_count), 0) as failure_rate
+    sum(d.failed_count) * 1.0 / nullif(sum(d.txn_count), 0) as failure_rate,
+    sum(d.txn_count) as transactions,
+    sum(d.failed_count) as failed
 from analytics.fct_account_daily as d
 inner join analytics.dim_accounts as a on d.account_id = a.account_id
 where 1 = 1

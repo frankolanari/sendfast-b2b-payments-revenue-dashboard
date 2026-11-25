@@ -28,11 +28,13 @@ export interface Filters {
   outcome_by?: Dimension;
   /** The group the reader focused on the outcomes chart (its key in that grouping). */
   outcome_focus?: string;
+  /** The account shown on Account 360. */
+  account?: string;
 }
 const VIEW_KEYS = ["velocity_by", "outcome_by"] as const;
 export type FilterKey = Exclude<
   keyof Filters,
-  "period" | "outcome_focus" | (typeof VIEW_KEYS)[number]
+  "period" | "outcome_focus" | "account" | (typeof VIEW_KEYS)[number]
 >;
 const FILTER_KEYS: FilterKey[] = [
   "segment",
@@ -57,6 +59,8 @@ export function parseFilters(search: string): Filters {
   }
   const focus = q.get("outcome_focus");
   if (focus) f.outcome_focus = focus;
+  const account = q.get("account");
+  if (account) f.account = account;
   return f;
 }
 
@@ -66,6 +70,7 @@ export function serializeFilters(f: Filters): string {
   for (const k of FILTER_KEYS) if (f[k]) q.set(k, f[k]!);
   for (const k of VIEW_KEYS) if (f[k]) q.set(k, f[k]!);
   if (f.outcome_focus) q.set("outcome_focus", f.outcome_focus);
+  if (f.account) q.set("account", f.account);
   const s = q.toString();
   return s ? `?${s}` : "";
 }
@@ -151,4 +156,13 @@ export function ignoredFilters(slugs: CardSlug[], f: Filters): string[] {
   };
   for (const k of FILTER_KEYS) if (f[k] && !accepts.has(k)) out.push(labels[k]);
   return out;
+}
+
+/** Cross-filtering: clicking a thing filters the page to it; clicking it again clears it. */
+export function useCrossFilter(): (key: FilterKey, value: unknown) => void {
+  const [f, set] = useFilters();
+  return (key, value) => {
+    const v = String(value);
+    set({ [key]: f[key] === v ? undefined : v });
+  };
 }

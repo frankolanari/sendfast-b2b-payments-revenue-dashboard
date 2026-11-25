@@ -12,11 +12,14 @@ export function VelocityTable({
   rows,
   groupLabel,
   highlight,
+  onSelect,
 }: {
   total?: Row;
   rows: Row[];
   groupLabel: string;
   highlight?: unknown;
+  /** Click a group's name to filter the page by it. */
+  onSelect?: (row: Row) => void;
 }) {
   const ranked = (r: Row) => num(r.closed_deals) >= MIN_SAMPLE;
   const sorted = [...rows].sort(
@@ -76,7 +79,20 @@ export function VelocityTable({
                 }
               >
                 <th scope="row" className="px-3 py-3 text-left font-medium">
-                  {all ? "All" : String(r.label)}
+                  {all ? (
+                    "All"
+                  ) : onSelect ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(r)}
+                      className="underline-offset-4 hover:underline"
+                      title={`Filter by ${String(r.label)}`}
+                    >
+                      {String(r.label)}
+                    </button>
+                  ) : (
+                    String(r.label)
+                  )}
                   {small && (
                     <span className="ml-2 text-xs font-normal">
                       too few to rank

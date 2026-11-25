@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   Bar,
   BarChart,
@@ -40,6 +41,7 @@ export function BarBreakdown({
   categoryLabel = (v) => String(v),
   labelWidth = 120,
   details,
+  onSelect,
 }: {
   rows: Row[];
   category: string;
@@ -55,7 +57,10 @@ export function BarBreakdown({
   labelWidth?: number;
   /** Tooltip rows for a bar: counts, shares, comparisons. Replaces the default series rows. */
   details?: (row: Row) => TooltipRow[];
+  /** Click (or Enter) on a bar: used to filter the page by that category. */
+  onSelect?: (row: Row) => void;
 }) {
+  const hovered = useRef<Row | null>(null);
   const stacked = Boolean(series);
   const data = rows.map((r) => {
     const out: Row = { ...r, __cat: categoryLabel(r[category]) };
@@ -79,60 +84,74 @@ export function BarBreakdown({
       : (toNumber(p.__base) ?? 0) + (toNumber(p.__hl) ?? 0);
 
   return (
-    <BarChart
-      ariaLabel={ariaLabel}
-      data={data}
-      xDataKey="__cat"
-      orientation={horizontal ? "horizontal" : "vertical"}
-      stacked
-      aspectRatio={aspectRatio ?? (horizontal ? "2 / 1" : "16 / 7")}
-      margin={
-        horizontal ? { left: labelWidth, right: 56 } : { left: 64, top: 24 }
+    <div
+      className={onSelect ? "cursor-pointer" : undefined}
+      onClick={() => hovered.current && onSelect?.(hovered.current)}
+      onKeyDown={(e) =>
+        e.key === "Enter" && hovered.current && onSelect?.(hovered.current)
       }
+      onMouseLeave={() => (hovered.current = null)}
     >
-      <Grid horizontal={!horizontal} vertical={horizontal} />
-      {bars.map((b) => (
-        <Bar
-          key={b.key}
-          dataKey={b.key}
-          label={b.label}
-          fill={b.color}
-          // Direct label on the highlighted bar only: selective, never a number on every bar.
-          showValue={!stacked && b.key === "__hl"}
-          valueLabelFormatter={(v) => (v ? format(v) : "")}
-        />
-      ))}
-      {horizontal ? (
-        <BarYAxis showAllLabels />
-      ) : (
-        // Short category lists (sources, stages) show every label; long time series thin to the
-        // labels that fit the plot width, so months never collide. The tooltip names every bar.
-        <BarXAxis showAllLabels={data.length <= MAX_LABELLED_CATEGORIES} />
-      )}
-      {!horizontal && <BarYAxis numTicks={4} formatValue={(v) => format(v)} />}
-      <ChartTooltip
-        content={({ point }) => (
-          <TooltipBody
-            title={String(point.__cat)}
-            total={format(total(point))}
-            rows={
-              details
-                ? details(point)
-                : stacked
-                  ? // Top of the stack first, as the eye reads it; zero series left out.
-                    [...bars]
-                      .reverse()
-                      .filter((b) => (toNumber(point[b.key]) ?? 0) !== 0)
-                      .map((b) => ({
-                        color: b.color,
-                        label: b.label,
-                        value: format(point[b.key]),
-                      }))
-                  : []
-            }
+      <BarChart
+        ariaLabel={ariaLabel}
+        data={data}
+        xDataKey="__cat"
+        orientation={horizontal ? "horizontal" : "vertical"}
+        stacked
+        aspectRatio={aspectRatio ?? (horizontal ? "2 / 1" : "16 / 7")}
+        margin={
+          horizontal ? { left: labelWidth, right: 56 } : { left: 64, top: 24 }
+        }
+      >
+        <Grid horizontal={!horizontal} vertical={horizontal} />
+        {bars.map((b) => (
+          <Bar
+            key={b.key}
+            dataKey={b.key}
+            label={b.label}
+            fill={b.color}
+            // Direct label on the highlighted bar only: selective, never a number on every bar.
+            showValue={!stacked && b.key === "__hl"}
+            valueLabelFormatter={(v) => (v ? format(v) : "")}
           />
+        ))}
+        {horizontal ? (
+          <BarYAxis showAllLabels />
+        ) : (
+          // Short category lists (sources, stages) show every label; long time series thin to the
+          // labels that fit the plot width, so months never collide. The tooltip names every bar.
+          <BarXAxis showAllLabels={data.length <= MAX_LABELLED_CATEGORIES} />
         )}
-      />
-    </BarChart>
+        {!horizontal && (
+          <BarYAxis numTicks={4} formatValue={(v) => format(v)} />
+        )}
+        <ChartTooltip
+          content={({ point }) => (
+            (hovered.current = point),
+            (
+              <TooltipBody
+                title={String(point.__cat)}
+                total={format(total(point))}
+                rows={
+                  details
+                    ? details(point)
+                    : stacked
+                      ? // Top of the stack first, as the eye reads it; zero series left out.
+                        [...bars]
+                          .reverse()
+                          .filter((b) => (toNumber(point[b.key]) ?? 0) !== 0)
+                          .map((b) => ({
+                            color: b.color,
+                            label: b.label,
+                            value: format(point[b.key]),
+                          }))
+                      : []
+                }
+              />
+            )
+          )}
+        />
+      </BarChart>
+    </div>
   );
 }

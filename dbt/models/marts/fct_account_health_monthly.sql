@@ -127,7 +127,12 @@ scored as (
                 txn_count >= {{ var("at_risk_min_transactions") }}
                 and failed_count * 1.0 / nullif(txn_count, 0) > {{ var("at_risk_failure_rate") }}
             )
-        ) as is_at_risk
+        ) as is_at_risk,
+        -- Why an at-risk account is at risk (the same two tests as above).
+        avg_volume_prev_3m_usd > 0 and volume_usd < {{ var("at_risk_volume_drop") }} * avg_volume_prev_3m_usd
+            as is_volume_down,
+        txn_count >= {{ var("at_risk_min_transactions") }}
+        and failed_count * 1.0 / nullif(txn_count, 0) > {{ var("at_risk_failure_rate") }} as is_failing
     from windowed
 
 )
@@ -147,6 +152,13 @@ select
     avg_revenue_prev_3m_usd,
     is_at_risk,
     case when is_at_risk then avg_revenue_prev_3m_usd else 0 end as revenue_at_risk_usd,
+    case
+        when not is_at_risk then null
+        when volume_usd = 0 then 'Stopped paying'
+        when is_volume_down and is_failing then 'Volume down and failures high'
+        when is_volume_down then 'Volume down'
+        else 'Failures high'
+    end as risk_reason,
     greatest(
         0,
         100
