@@ -3,6 +3,7 @@ import { BarBreakdown } from "@/charts/BarBreakdown";
 import { ChartCard } from "@/charts/ChartCard";
 import { Funnel } from "@/charts/Funnel";
 import { KpiTile } from "@/charts/KpiTile";
+import { Sankey } from "@/charts/Sankey";
 import { FilterBar } from "@/components/FilterBar";
 import { currency, days, month, percent, toNumber } from "@/lib/format";
 import { cardParams, PERIODS, useFilters } from "@/state/filters";
@@ -42,9 +43,10 @@ export function PipelinePage() {
   const byMonth = useCard("pipeline_by_month", p("pipeline_by_month"));
   const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
   const stageDays = useCard("days_in_stage", p("days_in_stage"));
-  const conversion = useCard(
-    "lead_conversion_by_source",
-    p("lead_conversion_by_source"),
+  const flow = useCard("deal_flow", p("deal_flow"));
+  const outcomes = useCard(
+    "deal_outcomes_by_source",
+    p("deal_outcomes_by_source"),
   );
 
   // Insight titles, computed from the data on screen, so they stay true under any filter.
@@ -67,11 +69,30 @@ export function PipelinePage() {
   const stageTitle = slowest
     ? `Deals wait longest in ${cap(slowest.stage).toLowerCase()}: ${days(slowest.median_days_in_stage)} at the median`
     : "Median days in stage";
-  const bestConv = by(known(conversion.data), "conversion_rate", "max");
-  const convTitle =
-    bestConv && known(conversion.data).length > 1
-      ? `${cap(bestConv.lead_source)} leads convert best: ${percent(bestConv.conversion_rate)} become opportunities`
-      : "Lead conversion by source";
+  // Channel story: which source wins least, which holds the most money still in play, and
+  // where the weakest source's lost deals stopped. Sources with too few deals are left out.
+  const sized = known(outcomes.data).filter(
+    (r) => (toNumber(r.deals) ?? 0) >= 10,
+  );
+  const worst = by(sized, "won_share", "min");
+  const richest = by(sized, "open_usd", "max");
+  const stall = worst
+    ? by(
+        (flow.data ?? []).filter(
+          (r) => r.lead_source === worst.lead_source && r.outcome === "lost",
+        ),
+        "deals",
+        "max",
+      )
+    : undefined;
+  const flowTitle = !worst
+    ? "How deals from each channel play out"
+    : richest && richest.lead_source === worst.lead_source
+      ? `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}) yet hold the most open pipeline (${currency(worst.open_usd)})`
+      : `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}); ${cap(richest?.lead_source).toLowerCase()} holds the most open pipeline (${currency(richest?.open_usd)})`;
+  const flowNote = stall
+    ? `Most lost ${String(worst?.lead_source)} deals stopped at ${String(stall.last_open_stage)}.`
+    : "";
 
   // Pipeline by month: pivot (month, source) rows into one row per month.
   const months = new Map<string, Row>();
@@ -96,7 +117,7 @@ export function PipelinePage() {
     <>
       <FilterBar show={["segment", "lead_source", "owner_id"]} />
 
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiTile
           slug="pipeline_created"
           params={p("pipeline_created")}
@@ -129,6 +150,14 @@ export function PipelinePage() {
           format={(v) => currency(v)}
           note="As of Oct 31, 2026"
         />
+        <KpiTile
+          slug="lead_conversion"
+          params={p("lead_conversion")}
+          label="Leads to opportunity"
+          column="conversion_rate"
+          format={(v) => percent(v)}
+          note={`Leads created, ${periodLabel.toLowerCase()}`}
+        />
       </section>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -159,6 +188,72 @@ export function PipelinePage() {
             highlight={(r) => r === lowestWin}
             ariaLabel="Win rate by lead source"
           />
+        </ChartCard>
+      </section>
+
+      <section className="mt-4">
+        <ChartCard
+          title={flowTitle}
+          subtitle={`Deals created, ${periodLabel.toLowerCase()}: lead source → last open stage reached → outcome. ${flowNote}`}
+          query={flow}
+        >
+          <Sankey
+            rows={flow.data ?? []}
+            value="deals"
+            ariaLabel="Deals by lead source, last open stage reached and outcome"
+            steps={[
+              {
+                key: "lead_source",
+                order: SOURCES,
+                label: cap,
+                color: (v) => SOURCE_COLOR[v],
+              },
+              {
+                key: "last_open_stage",
+                order: ["discovery", "qualified", "proposal", "negotiation"],
+                label: cap,
+              },
+              {
+                key: "outcome",
+                order: ["won", "open", "lost"],
+                label: (v) => (v === "open" ? "Still open" : cap(v)),
+                color: (v) =>
+                  v === "won"
+                    ? "var(--brand-accent)"
+                    : "var(--chart-neutral-bar)",
+              },
+            ]}
+          />
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(outcomes.data ?? []).map((r) => (
+              <div
+                key={String(r.lead_source)}
+                className={
+                  r === worst
+                    ? "rounded-lg border border-brand-accent/60 bg-foreground/5 px-3 py-2"
+                    : "rounded-lg border px-3 py-2"
+                }
+              >
+                <dt className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: SOURCE_COLOR[String(r.lead_source)] }}
+                  />
+                  {cap(r.lead_source)}
+                </dt>
+                <dd className="mt-1 text-sm">
+                  <span className="font-medium">{percent(r.won_share, 0)}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    won of {String(r.deals)}
+                  </span>
+                </dd>
+                <dd className="text-xs text-muted-foreground">
+                  {currency(r.open_usd)} still open
+                </dd>
+              </div>
+            ))}
+          </dl>
         </ChartCard>
       </section>
 
@@ -228,25 +323,6 @@ export function PipelinePage() {
             format={(v) => days(v)}
             highlight={(r) => r === slowest}
             ariaLabel="Median days in stage"
-          />
-        </ChartCard>
-      </section>
-
-      <section className="mt-4">
-        <ChartCard
-          title={convTitle}
-          subtitle="Share of leads created in the period that became an opportunity"
-          query={conversion}
-        >
-          <BarBreakdown
-            rows={conversion.data ?? []}
-            category="lead_source"
-            categoryLabel={cap}
-            value="conversion_rate"
-            format={(v) => percent(v)}
-            highlight={(r) => r === bestConv}
-            ariaLabel="Lead conversion by source"
-            aspectRatio="16 / 4"
           />
         </ChartCard>
       </section>

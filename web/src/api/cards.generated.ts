@@ -166,6 +166,32 @@ export const cards = {
     ],
     "required": []
   },
+  "deal_flow": {
+    "name": "Deal flow by source, stage and outcome",
+    "collection": "Pipeline",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
+  "deal_outcomes_by_source": {
+    "name": "Deal outcomes by lead source",
+    "collection": "Pipeline",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
   "dispute_rate_by_month": {
     "name": "Dispute and return rate by month",
     "collection": "Risk",
@@ -251,6 +277,17 @@ export const cards = {
     "required": [
       "date_to"
     ]
+  },
+  "lead_conversion": {
+    "name": "Lead conversion",
+    "collection": "Pipeline",
+    "display": "scalar",
+    "params": [
+      "date_from",
+      "date_to",
+      "lead_source"
+    ],
+    "required": []
   },
   "lead_conversion_by_source": {
     "name": "Lead conversion by lead source",
