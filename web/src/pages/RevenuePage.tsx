@@ -159,8 +159,9 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={trendI.title}
-          subtitle={`Net revenue per month, by component, ${periodLabel.toLowerCase()}`}
+          name="Monthly net revenue"
+          insight={trendI.title}
+          note={`Net revenue per month, by component, ${periodLabel.toLowerCase()}`}
           query={byMonth}
         >
           <BarBreakdown
@@ -220,8 +221,9 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={bridgeI.title}
-          subtitle={`How monthly net revenue moved, ${bridgePeriod.toLowerCase()}: the month before the period, the moves during it, and its last month${f.period === "all" ? " (the bridge needs a date range: showing the last 12 months)" : ""}`}
+          name="Revenue bridge"
+          insight={bridgeI.title}
+          note={`How monthly net revenue moved, ${bridgePeriod.toLowerCase()}: the month before the period, the moves during it, and its last month${f.period === "all" ? " (the bridge needs a date range: showing the last 12 months)" : ""}`}
           query={bridge}
         >
           <Waterfall
@@ -238,8 +240,9 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={cohortI.title}
-          subtitle="Share of each go-live quarter's accounts still active, by months since go-live. Hover a cell for accounts and revenue."
+          name="Cohort retention"
+          insight={cohortI.title}
+          note="Share of each go-live quarter's accounts still active, by months since go-live. Hover a cell for accounts and revenue."
           query={cohorts}
           ignores={skip("cohort_retention_grid")}
         >
@@ -263,8 +266,9 @@ export function RevenuePage() {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={churnI.title}
-          subtitle={`Accounts live in the data window; slow = more than 45 days from won to first payment. Median activation: ${activation.data?.[0]?.activation_days != null ? days(activation.data[0].activation_days) : "–"} for deals won ${periodLabel.toLowerCase()}`}
+          name="Churn by activation speed"
+          insight={churnI.title}
+          note={`Accounts live in the data window; slow = more than 45 days from won to first payment. Median activation: ${activation.data?.[0]?.activation_days != null ? days(activation.data[0].activation_days) : "–"} for deals won ${periodLabel.toLowerCase()}`}
           query={churn}
           ignores={skip("churn_by_activation_speed")}
         >
@@ -289,8 +293,9 @@ export function RevenuePage() {
           />
         </ChartCard>
         <ChartCard
-          title={yearI.title}
-          subtitle="Median net revenue per account in its first 12 months from go-live (accounts with a full first year)"
+          name="First-year revenue by lead source"
+          insight={yearI.title}
+          note="Median net revenue per account in its first 12 months from go-live (accounts with a full first year)"
           query={firstYear}
           ignores={skip("revenue_first_12m_by_source")}
         >

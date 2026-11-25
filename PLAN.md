@@ -482,7 +482,7 @@ where 1=1
     2. **Revenue & retention:** net revenue trend, revenue bridge, cohort NRR/GRR heatmap, activation days vs retention, 12-month revenue by lead source
     3. **Account health & risk:** at-risk accounts, failure rate by corridor and rail, disputes/returns, revenue at risk, concentration
     4. **Account 360:** one account's timeline from lead to opportunity, onboarding, volume, pricing changes and risk. Every account name elsewhere links here.
-  - **Chart titles state the insight**, e.g. "Partner-sourced accounts earn 2× net revenue per account in their first 12 months".
+  - **Each chart has a short recognisable name, then the insight, then a note** (owner, 2026-11-25; replaces "titles state the insight"). Name: "First-year revenue by lead source". Insight under it: "Partner-sourced accounts earn 2× net revenue per account in their first 12 months". Note: what is measured.
   - **Snapshot mode** (`VITE_MODE=snapshot`): reads static JSON instead of calling the proxy. Supports a fixed set of filter presets; other filter combinations are disabled with a note.
 - `scripts/metabase_export_snapshot.py`: runs every card for every preset and writes `web/public/snapshot/*.json`.
 

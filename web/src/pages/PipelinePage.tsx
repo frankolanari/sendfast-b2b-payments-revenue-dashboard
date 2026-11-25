@@ -192,8 +192,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={funnelI.title}
-          subtitle={`Leads created, ${periodLabel.toLowerCase()}, followed to their deals. Under each step: what leaked there. Hover a step for more.`}
+          name="Sales funnel"
+          insight={funnelI.title}
+          note={`Leads created, ${periodLabel.toLowerCase()}, followed to their deals. Under each step: what leaked there. Hover a step for more.`}
           query={funnel}
           isEmpty={!leads}
         >
@@ -262,8 +263,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={ageI.title}
-          subtitle="Open pipeline as of Oct 31, 2026, by how long ago each deal was created"
+          name="Pipeline ageing"
+          insight={ageI.title}
+          note="Open pipeline as of Oct 31, 2026, by how long ago each deal was created"
           query={ageing}
           ignores={skip("pipeline_ageing")}
         >
@@ -324,8 +326,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={velocityI.title}
-          subtitle={`Sales velocity: open deals today × average won deal × win rate ÷ sales cycle. The last three come from deals closed ${periodLabel.toLowerCase()}. Segment figures don't add up to the total.`}
+          name="Sales velocity"
+          insight={velocityI.title}
+          note={`Open deals today × average won deal × win rate ÷ sales cycle. The last three come from deals closed ${periodLabel.toLowerCase()}. Segment figures don't add up to the total.`}
           query={velocity}
         >
           <VelocityTable
@@ -337,8 +340,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={channelI.title}
-          subtitle={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${leakNote(gates.data ?? [], channelI.highlight, GATES)}`}
+          name="Channel outcomes"
+          insight={channelI.title}
+          note={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${leakNote(gates.data ?? [], channelI.highlight, GATES)}`}
           query={gates}
         >
           <Sankey
@@ -382,8 +386,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={monthI.title}
-          subtitle={`Pipeline created per month, by lead source, ${periodLabel.toLowerCase()}`}
+          name="Pipeline created by month"
+          insight={monthI.title}
+          note={`Pipeline created per month, by lead source, ${periodLabel.toLowerCase()}`}
           query={byMonth}
         >
           <BarBreakdown
@@ -428,8 +433,9 @@ export function PipelinePage() {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={winI.title}
-          subtitle={`Won / closed deals by lead source, closed ${periodLabel.toLowerCase()}`}
+          name="Win rate by lead source"
+          insight={winI.title}
+          note={`Won / closed deals by lead source, closed ${periodLabel.toLowerCase()}`}
           query={winBySource}
         >
           <BarBreakdown
@@ -450,8 +456,9 @@ export function PipelinePage() {
           />
         </ChartCard>
         <ChartCard
-          title={stageI.title}
-          subtitle={`Median days in each stage, for stages entered ${periodLabel.toLowerCase()}`}
+          name="Time in stage"
+          insight={stageI.title}
+          note={`Median days in each stage, for stages entered ${periodLabel.toLowerCase()}`}
           query={stageDays}
         >
           <BarBreakdown
@@ -474,8 +481,9 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={repI.title}
-          subtitle={`Open pipeline as of Oct 31, 2026${repI.highlight ? "; highlighted: the largest past-due share" : ""}`}
+          name="Open pipeline by rep"
+          insight={repI.title}
+          note={`Open pipeline as of Oct 31, 2026${repI.highlight ? "; highlighted: the largest past-due share" : ""}`}
           query={reps}
           ignores={skip("open_pipeline_by_rep")}
         >

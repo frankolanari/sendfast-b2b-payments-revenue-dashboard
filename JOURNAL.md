@@ -329,6 +329,14 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: check a page against the plan's list before calling it done; put leakage on the funnel itself; say what data can't show instead of charting it. Specific: the lead-to-deal match rule.
 **Tags:** #linkedin #article #case-study #skill
 
+## 2026-11-25 · Stage 7 · Owner decision: name first, finding second, explanation third
+**Type:** decision
+**What happened:** The plan said chart titles should state the insight. In use, the owner found long sentence titles hard to scan: "these have to have recognizable titles that somebody can easily see", like the scorecards. Every chart card now reads: a short name ("Sales funnel", "Cohort retention"), the computed finding under it, then a small note saying what is measured. PLAN.md Stage 7 updated.
+**Why it matters:** A headline that changes with every filter can't be the thing a reader navigates by. Names are stable landmarks; findings move underneath them.
+**Quotable line:** "Titles are for finding the chart. Insights are for reading it."
+**Generic vs specific (#skill):** generic: name / finding / note hierarchy for every chart card. Specific: the names chosen.
+**Tags:** #linkedin #x #skill
+
 ---
 
 ## Owner notes
