@@ -26,3 +26,6 @@ dbt/logs/
 .idea/
 .vscode/
 dbt/.user.yml
+
+# Owner's design inspiration (a saved third-party web page): reference only, never committed
+html website sample/
