@@ -47,6 +47,12 @@ models:
       - name: net_revenue_first_12m_usd
         description: Net revenue in the first 12 calendar months from go-live; null unless all 12 are in the window.
 
+  - name: dim_stages
+    description: Opportunity stages in funnel order; lost is terminal and unranked.
+    columns:
+      - name: stage
+        data_tests: [not_null, unique]
+
   - name: fct_leads_funnel
     columns:
       - name: lead_id
@@ -66,6 +72,12 @@ models:
     columns:
       - name: opportunity_id
         data_tests: [not_null, unique]
+      - name: furthest_stage_rank
+        description: Highest funnel rank reached (dim_stages); every deal starts at discovery.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [1, 2, 3, 4, 5], quote: false }
       - name: account_id
         data_tests:
           - not_null

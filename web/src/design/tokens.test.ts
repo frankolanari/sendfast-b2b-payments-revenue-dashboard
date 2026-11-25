@@ -49,6 +49,17 @@ describe("tokens", () => {
     },
   );
 
+  it.each(["light", "dark"] as const)(
+    "chart marks clear 3:1 on the surface (neutral bar, accent), %s",
+    (mode) => {
+      const bg = tokens.color.surface[mode];
+      expect(
+        contrast(tokens.chart.neutralBar[mode], bg),
+      ).toBeGreaterThanOrEqual(3);
+      expect(contrast(tokens.color.accent[mode], bg)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
   it("sequential ramp gets darker step by step", () => {
     const lum = tokens.sequential.map((hex) => contrast(hex, "#000000"));
     lum.slice(1).forEach((l, i) => expect(l).toBeLessThan(lum[i]));

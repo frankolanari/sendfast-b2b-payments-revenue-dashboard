@@ -1,15 +1,29 @@
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-} from "@tanstack/react-query";
-import { fetchCard } from "@/api/client";
-import type { CardSlug } from "@/api/cards.generated";
-import { currency, percent } from "@/lib/format";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Moon, Sun } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 import { applyTheme, saveTheme, storedTheme } from "@/design/theme";
 import type { Mode } from "@/design/tokens";
-import { Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { PipelinePage } from "@/pages/PipelinePage";
+import { navigate, usePath } from "@/state/filters";
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: Infinity, retry: 1 } },
+});
+
+const PAGES = [
+  { path: "/pipeline", label: "Pipeline & funnel", title: "Pipeline & funnel" },
+  {
+    path: "/revenue",
+    label: "Revenue & retention",
+    title: "Revenue & retention",
+  },
+  {
+    path: "/risk",
+    label: "Account health & risk",
+    title: "Account health & risk",
+  },
+  { path: "/accounts", label: "Account 360", title: "Account 360" },
+] as const;
 
 function ThemeToggle() {
   const [mode, setMode] = useState<Mode>(storedTheme);
@@ -35,82 +49,65 @@ function ThemeToggle() {
   );
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: Infinity, retry: 1 } },
-});
-
-// Work-in-progress preview (Stage 7): the shell and tiles in the new design direction.
-// Replaced page by page as the real dashboard is built.
-const PAGES = [
-  "Pipeline & funnel",
-  "Revenue & retention",
-  "Account health & risk",
-  "Account 360",
-];
-const TRAILING_12 = { date_from: "2025-11-01", date_to: "2026-10-31" };
-
-const TILES: {
-  slug: CardSlug;
+function NavLink({
+  path,
+  label,
+  active,
+}: {
+  path: string;
   label: string;
-  format: (v: unknown) => string;
-}[] = [
-  {
-    slug: "pipeline_created",
-    label: "Pipeline created",
-    format: (v) => currency(v),
-  },
-  { slug: "win_rate", label: "Win rate", format: (v) => percent(v) },
-  { slug: "net_revenue", label: "Net revenue", format: (v) => currency(v) },
-  {
-    slug: "total_payment_volume",
-    label: "Payment volume",
-    format: (v) => currency(v),
-  },
-];
-
-function KpiTile({ slug, label, format }: (typeof TILES)[number]) {
-  const q = useQuery({
-    queryKey: ["card", slug, TRAILING_12],
-    queryFn: () => fetchCard(slug, TRAILING_12),
-  });
+  active: boolean;
+}) {
+  const go = (e: MouseEvent) => {
+    e.preventDefault();
+    navigate(path);
+  };
   return (
-    <div className="shadow-card rounded-xl border bg-card p-5">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      {/* No tabular-nums here: Cal Sans makes the decimal point full-width under it. */}
-      <div className="mt-3 font-display text-4xl tracking-tight">
-        {q.isPending ? (
-          <span className="inline-block h-9 w-28 animate-pulse rounded-md bg-muted" />
-        ) : q.isError ? (
-          <span className="text-base text-destructive">Couldn't load</span>
-        ) : (
-          format(q.data.rows[0]?.[0])
-        )}
-      </div>
-      <div className="mt-1 text-xs text-muted-foreground">
-        Nov 2025 – Oct 2026
-      </div>
+    <a
+      href={path}
+      onClick={go}
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? "rounded-lg bg-foreground/10 px-3 py-1.5 font-medium"
+          : "rounded-lg px-3 py-1.5 text-ink-secondary hover:text-foreground"
+      }
+    >
+      {label}
+    </a>
+  );
+}
+
+function ComingNext({ title }: { title: string }) {
+  return (
+    <div className="shadow-card mt-6 rounded-xl border bg-card p-10 text-center text-ink-secondary">
+      {title} is next on the build list.
     </div>
   );
 }
 
 export function App() {
+  const path = usePath();
+  const page = PAGES.find((p) => path.startsWith(p.path)) ?? PAGES[0];
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-background">
-        <header className="glass-bar sticky top-2 z-10 mx-auto mt-2 flex max-w-6xl items-center gap-6 rounded-2xl px-4 py-2">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+        >
+          Skip to content
+        </a>
+        <header className="glass-bar sticky top-2 z-20 mx-auto mt-2 flex max-w-6xl items-center gap-6 rounded-2xl px-4 py-2">
           <span className="font-display text-xl tracking-tight">SendFast</span>
           <nav className="flex gap-1 text-sm" aria-label="Pages">
-            {PAGES.map((p, i) => (
-              <span
-                key={p}
-                className={
-                  i === 0
-                    ? "rounded-lg bg-foreground/10 px-3 py-1.5 font-medium"
-                    : "rounded-lg px-3 py-1.5 text-ink-secondary"
-                }
-              >
-                {p}
-              </span>
+            {PAGES.map((p) => (
+              <NavLink
+                key={p.path}
+                path={p.path}
+                label={p.label}
+                active={p === page}
+              />
             ))}
           </nav>
           <span className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground">
@@ -119,31 +116,15 @@ export function App() {
           <ThemeToggle />
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-10">
-          <span className="rounded-md border bg-card px-2 py-1 text-xs uppercase tracking-widest text-muted-foreground">
-            Work in progress
-          </span>
-          <h1 className="mt-4 font-display text-5xl tracking-tight">
-            Pipeline &amp; funnel
-          </h1>
-          <p className="mt-2 max-w-2xl text-ink-secondary">
-            Live from Metabase through the proxy, trailing 12 months. Charts,
-            filters and the other pages come next.
-          </p>
-          <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {TILES.map((t) => (
-              <KpiTile key={t.slug} {...t} />
-            ))}
-          </section>
-          <section className="mt-6 rounded-2xl bg-paper p-6">
-            <div className="font-display text-2xl tracking-tight">
-              Insight panels use the warm paper colour
-            </div>
-            <p className="mt-1 text-sm text-ink-secondary">
-              Chart titles will state the finding, e.g. "Partner leads close at
-              27%, the lowest of any source".
-            </p>
-          </section>
+        <main id="main" className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+          <h1 className="font-display text-5xl tracking-tight">{page.title}</h1>
+          <div className="mt-6">
+            {page.path === "/pipeline" ? (
+              <PipelinePage />
+            ) : (
+              <ComingNext title={page.title} />
+            )}
+          </div>
         </main>
       </div>
     </QueryClientProvider>

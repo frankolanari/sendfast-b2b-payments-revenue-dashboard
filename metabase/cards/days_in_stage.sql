@@ -2,17 +2,18 @@
 -- collection: Pipeline
 -- display: row
 -- params: [date_from, date_to, lead_source, owner_id]
--- description: Median days opportunities spent in each stage, for stage entries in the period.
+-- description: Median days opportunities spent in each open stage, for stage entries in the period, in funnel order.
 -- viz: {graph.dimensions: [stage], graph.metrics: [median_days_in_stage]}
 select
-    stage,
-    percentile_cont(0.5) within group (order by days_in_stage) as median_days_in_stage,
+    t.stage,
+    percentile_cont(0.5) within group (order by t.days_in_stage) as median_days_in_stage,
     count(*) as stage_entries
-from analytics.fct_stage_transitions
-where days_in_stage is not null
-  [[ and entered_at >= {{date_from}} ]]
-  [[ and entered_at < cast({{date_to}} as date) + 1 ]]
-  [[ and lead_source = {{lead_source}} ]]
-  [[ and owner_id = {{owner_id}} ]]
-group by stage
-order by min(stage_sequence)
+from analytics.fct_stage_transitions as t
+inner join analytics.dim_stages as s on t.stage = s.stage
+where s.is_open_stage and t.days_in_stage is not null
+  [[ and t.entered_at >= {{date_from}} ]]
+  [[ and t.entered_at < cast({{date_to}} as date) + 1 ]]
+  [[ and t.lead_source = {{lead_source}} ]]
+  [[ and t.owner_id = {{owner_id}} ]]
+group by t.stage, s.stage_rank
+order by s.stage_rank

@@ -409,6 +409,19 @@ export const cards = {
     ],
     "required": []
   },
+  "stage_funnel": {
+    "name": "Deals by furthest stage reached",
+    "collection": "Pipeline",
+    "display": "bar",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
   "take_rate": {
     "name": "Take rate",
     "collection": "Revenue",

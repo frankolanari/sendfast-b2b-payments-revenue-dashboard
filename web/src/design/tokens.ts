@@ -89,6 +89,8 @@ export const tokens = {
     grid: pair("#e1e0d9", "#2c2c2a"),
     baseline: pair("#c3c2b7", "#383835"),
     label: pair("#676b75", "#a1a1a1"),
+    // Non-highlighted bars: recede, but stay >= 3:1 on the surface (WCAG 1.4.11).
+    neutralBar: pair("#8a8880", "#6b6b6b"),
   },
 
   font: {
@@ -184,6 +186,7 @@ export function cssVariables(mode: Mode): Record<string, string> {
     "--chart-positive": tokens.diverging.positive[mode],
     "--chart-negative": tokens.diverging.negative[mode],
     "--chart-neutral": tokens.diverging.neutral[mode],
+    "--chart-neutral-bar": tokens.chart.neutralBar[mode],
     // type and spacing
     "--font-sans": tokens.font.sans,
     "--font-heading": tokens.font.display,
