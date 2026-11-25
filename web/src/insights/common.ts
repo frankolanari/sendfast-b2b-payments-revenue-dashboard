@@ -10,6 +10,7 @@ export const num = (v: unknown) => toNumber(v) ?? 0;
 
 export const cap = (v: unknown) => {
   const s = String(v ?? "");
+  if (s === "smb") return "SMB";
   return s === "mid_market"
     ? "Mid-market"
     : s.charAt(0).toUpperCase() + s.slice(1);

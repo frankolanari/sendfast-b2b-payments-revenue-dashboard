@@ -15,6 +15,7 @@ export function Funnel({
   ariaLabel,
   stageLabel = (s) => String(s),
   details,
+  unit = "deals",
 }: {
   rows: Row[];
   stage: string;
@@ -22,6 +23,8 @@ export function Funnel({
   ariaLabel: string;
   stageLabel?: (s: unknown) => string;
   details?: (index: number) => TooltipRow[];
+  /** What each step counts, for labels and tooltips. */
+  unit?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
@@ -52,7 +55,7 @@ export function Funnel({
             key={d.label}
             type="button"
             className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`${d.label}: ${d.displayValue} deals`}
+            aria-label={`${d.label}: ${d.displayValue} ${unit}`}
             aria-pressed={pinned === i}
             onMouseEnter={() => setHover(i)}
             onFocus={() => setHover(i)}
@@ -76,7 +79,7 @@ export function Funnel({
         >
           <TooltipBody
             title={data[active].label}
-            total={`${data[active].displayValue} deals`}
+            total={`${data[active].displayValue} ${unit}`}
             rows={details?.(active) ?? []}
           />
         </div>

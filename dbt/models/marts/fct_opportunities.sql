@@ -68,5 +68,14 @@ select
     close_date < created_date as has_invalid_close_date,
     case when is_closed and close_date >= created_date then close_date - created_date end as sales_cycle_days,
     not is_closed as is_open,
-    not is_closed and close_date < {{ as_of_date() }} as is_past_due
+    not is_closed and close_date < {{ as_of_date() }} as is_past_due,
+    -- Pipeline ageing, as of the as-of date: open deals only.
+    case when not is_closed then {{ as_of_date() }} - created_date end as age_days,
+    case
+        when is_closed then null
+        when {{ as_of_date() }} - created_date <= 30 then '0-30 days'
+        when {{ as_of_date() }} - created_date <= 60 then '31-60 days'
+        when {{ as_of_date() }} - created_date <= 90 then '61-90 days'
+        else 'Over 90 days'
+    end as age_bucket
 from dated

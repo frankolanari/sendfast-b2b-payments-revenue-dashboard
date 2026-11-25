@@ -1,14 +1,12 @@
 import { parameterContract } from "@/api/cards.generated";
 import { useCard } from "@/api/useCard";
+import { cap } from "@/insights/common";
 import {
   PERIODS,
   useFilters,
   type FilterKey,
   type PeriodKey,
 } from "@/state/filters";
-
-const pretty = (v: string) =>
-  v === "mid_market" ? "Mid-market" : v[0].toUpperCase() + v.slice(1);
 
 function Select({
   name,
@@ -51,11 +49,11 @@ export function FilterBar({ show }: { show: FilterKey[] }) {
   const options: Record<FilterKey, { value: string; label: string }[]> = {
     segment: parameterContract.segment.values.map((v) => ({
       value: v,
-      label: pretty(v),
+      label: cap(v),
     })),
     lead_source: parameterContract.lead_source.values.map((v) => ({
       value: v,
-      label: pretty(v),
+      label: cap(v),
     })),
     owner_id: (reps.data ?? []).map((r) => ({
       value: String(r.rep_id),

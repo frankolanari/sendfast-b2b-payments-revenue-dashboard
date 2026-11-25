@@ -313,6 +313,19 @@ export const cards = {
     ],
     "required": []
   },
+  "lead_funnel": {
+    "name": "Lead to won funnel",
+    "collection": "Pipeline",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
   "net_revenue": {
     "name": "Net revenue (USD)",
     "collection": "Revenue",
@@ -353,6 +366,17 @@ export const cards = {
     "name": "Open pipeline by rep",
     "collection": "Pipeline",
     "display": "bar",
+    "params": [
+      "segment",
+      "lead_source",
+      "owner_id"
+    ],
+    "required": []
+  },
+  "pipeline_ageing": {
+    "name": "Open pipeline by age",
+    "collection": "Pipeline",
+    "display": "table",
     "params": [
       "segment",
       "lead_source",
@@ -474,10 +498,10 @@ export const cards = {
     ],
     "required": []
   },
-  "stage_funnel": {
-    "name": "Deals by furthest stage reached",
+  "sales_velocity": {
+    "name": "Sales velocity by segment",
     "collection": "Pipeline",
-    "display": "bar",
+    "display": "table",
     "params": [
       "date_from",
       "date_to",

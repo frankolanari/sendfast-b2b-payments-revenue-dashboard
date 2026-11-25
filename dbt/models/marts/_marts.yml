@@ -170,6 +170,22 @@ models:
       - name: months_since_live
         data_tests: [not_null]
 
+  - name: fct_lead_journeys
+    description: One row per lead, followed through to its deal (lead -> opportunity -> won).
+    data_tests:
+      - expression_is_true:
+          arguments: { expression: "is_converted or opportunity_id is null" }
+    columns:
+      - name: lead_id
+        data_tests: [not_null, unique]
+      - name: opportunity_id
+        data_tests: [unique]
+      - name: stage_reached
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [0, 1, 2, 3, 4, 5], quote: false }
+
   - name: fct_account_health_monthly
     data_tests:
       - unique_combination_of_columns:

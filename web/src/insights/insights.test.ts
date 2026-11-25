@@ -2,10 +2,13 @@
 import { describe, expect, it } from "vitest";
 import {
   channelInsight,
-  funnelInsight,
   pipelineByMonthInsight,
   repInsight,
   winRateInsight,
+  ageingInsight,
+  biggestLeak,
+  leadFunnelInsight,
+  velocityInsight,
 } from "./pipeline";
 import {
   activationInsight,
@@ -72,20 +75,6 @@ describe("never compare one thing with itself", () => {
 });
 
 describe("recent periods and empty numbers", () => {
-  it("says most September deals are still open instead of a win share", () => {
-    const funnel = [
-      { stage: "discovery", stage_rank: 1, opportunities: 42 },
-      { stage: "won", stage_rank: 5, opportunities: 1 },
-    ];
-    const t = funnelInsight(
-      funnel,
-      [outcome("inbound", 42, 1, 38, 3_000_000)],
-      "sep2026",
-    ).title;
-    expect(t).toBe(
-      "90% of deals created in Sep 2026 are still open; 2% won so far",
-    );
-  });
   it("never reports $0 open pipeline as the most", () => {
     const rows = [
       outcome("inbound", 50, 20, 0, 0),
@@ -176,5 +165,89 @@ describe("real findings still show", () => {
         { new: "New" },
       ).title,
     ).toBe("New added $500; nothing was lost");
+  });
+});
+
+const step = (
+  stage_rank: number,
+  reached: number,
+  open_here = 0,
+  lost_here = 0,
+  lost_here_usd = 0,
+) => ({
+  stage_rank,
+  reached,
+  open_here,
+  lost_here,
+  lost_here_usd,
+  stage: ["lead", "discovery", "qualified", "proposal", "negotiation", "won"][
+    stage_rank
+  ],
+});
+
+describe("lead funnel with leakage, ageing, velocity", () => {
+  const rows = [
+    step(0, 1529),
+    step(1, 438, 41, 52, 3_660_600),
+    step(2, 345, 30, 59, 5_475_500),
+    step(3, 256, 33, 33, 1_716_400),
+    step(4, 190, 37, 57, 5_741_800),
+    step(5, 96),
+  ];
+  it("says the share without a deal and where the most value leaks", () => {
+    const i = leadFunnelInsight(rows, "t12");
+    expect(i.title).toBe(
+      "71% of leads created in the last 12 months have no deal; negotiation leaks the most, $5.7M lost",
+    );
+    expect(i.highlight?.stage).toBe("negotiation");
+  });
+  it("young cohorts are reported as open, empty ones say so, tiny losses aren't ranked", () => {
+    expect(
+      leadFunnelInsight([step(0, 100), step(1, 20, 18)], "sep2026").title,
+    ).toMatch(/90% of the deals are still open/);
+    expect(leadFunnelInsight([step(0, 0)], "sep2026").title).toBe(
+      "No leads were created in Sep 2026",
+    );
+    expect(biggestLeak([step(1, 20, 0, 2, 100)])).toBeUndefined();
+  });
+  it("ageing: old share, and nothing old", () => {
+    const rows = [
+      { age_bucket: "0-30 days", open_usd: 9_000_000, past_due_usd: 0 },
+      {
+        age_bucket: "Over 90 days",
+        open_usd: 5_250_000,
+        past_due_usd: 727_900,
+      },
+    ];
+    expect(ageingInsight(rows).title).toBe(
+      "$5.3M, 37% of open pipeline, is over 90 days old; $727.9K of it is past its close date",
+    );
+    expect(ageingInsight([rows[0]]).title).toBe(
+      "No open deal is older than 90 days or past its close date",
+    );
+  });
+  it("velocity: headline, fastest segment, and small samples", () => {
+    const all = {
+      segment: "all",
+      closed_deals: 426,
+      velocity_usd_per_day: 47050,
+    };
+    const ent = {
+      segment: "enterprise",
+      closed_deals: 71,
+      velocity_usd_per_day: 28847,
+    };
+    const smb = {
+      segment: "smb",
+      closed_deals: 205,
+      velocity_usd_per_day: 3837,
+    };
+    expect(velocityInsight([all, smb, ent]).highlight).toBe(ent);
+    expect(velocityInsight([all, smb]).title).toBe(
+      "Open pipeline turns into $47.1K of won revenue a day",
+    );
+    expect(velocityInsight([{ ...all, closed_deals: 3 }]).title).toMatch(
+      /Too few/,
+    );
   });
 });

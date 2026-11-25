@@ -320,6 +320,15 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: insight titles need sample-size, censoring and degenerate-group rules, tested like any logic; label ignored filters instead of silently ignoring them. Specific: the pipeline and revenue findings.
 **Tags:** #linkedin #article #skill
 
+## 2026-11-25 · Stage 7 · Leakage and decay: the owner spots what the page was missing
+**Type:** pushback
+**What happened:** The owner pointed out that the Pipeline page showed neither deal decay nor leakage. Re-reading the plan, the agent had also dropped two items it does ask for: a lead -> opportunity -> won funnel and a velocity breakdown. The agent proposed four charts and said what the data cannot show (win rates don't fall with deal age, almost no stalled deals, close-date pushes aren't recorded). The owner declined planting a decay story ("we don't have to plant a story"), then improved the design mid-build: one bigger funnel starting at leads, with leakage under each step, instead of a separate leakage chart. Built that way, plus an ageing chart (open value by deal age, past close date marked) and a velocity table (open deals x average won x win rate / cycle, by segment).
+**Problem -> fix:** following leads through the funnel needs the same people, but the CRM contract has no lead id on the opportunity. A converted lead is matched to the opportunity of the same account created on the conversion date (1,193 of 1,193 match one to one here, tested for uniqueness). That is an assumption to verify against a real CRM at the swap (Stage 8).
+**Numbers:** 1,529 leads -> 96 won in 12 months; negotiation leaks most ($5.7M); $5.3M of open pipeline is over 90 days old; velocity $47,050.45 a day, equal to the golden metric.
+**Quotable line:** "Two charts became one better one: the funnel already knew where it leaked."
+**Generic vs specific (#skill):** generic: check a page against the plan's list before calling it done; put leakage on the funnel itself; say what data can't show instead of charting it. Specific: the lead-to-deal match rule.
+**Tags:** #linkedin #article #case-study #skill
+
 ---
 
 ## Owner notes

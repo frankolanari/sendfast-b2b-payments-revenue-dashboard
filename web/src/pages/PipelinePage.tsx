@@ -6,15 +6,18 @@ import { buildOutcomeFlow, GATES } from "@/charts/flows";
 import { Funnel } from "@/charts/Funnel";
 import { KpiTile } from "@/charts/KpiTile";
 import { Sankey } from "@/charts/Sankey";
+import { VelocityTable } from "@/charts/VelocityTable";
 import { FilterBar } from "@/components/FilterBar";
 import { cap, num } from "@/insights/common";
 import {
   channelInsight,
-  funnelInsight,
+  ageingInsight,
+  leadFunnelInsight,
   leakNote,
   pipelineByMonthInsight,
   repInsight,
   stageDaysInsight,
+  velocityInsight,
   winRateInsight,
 } from "@/insights/pipeline";
 import { count, currency, days, month, percent } from "@/lib/format";
@@ -40,7 +43,9 @@ export function PipelinePage() {
   const skip = (...slugs: CardSlug[]) => ignoredFilters(slugs, f);
   const periodLabel = PERIODS[f.period].label;
 
-  const funnel = useCard("stage_funnel", p("stage_funnel"));
+  const funnel = useCard("lead_funnel", p("lead_funnel"));
+  const ageing = useCard("pipeline_ageing", p("pipeline_ageing"));
+  const velocity = useCard("sales_velocity", p("sales_velocity"));
   const gates = useCard("deal_gates", p("deal_gates"));
   const outcomes = useCard(
     "deal_outcomes_by_source",
@@ -63,11 +68,25 @@ export function PipelinePage() {
   const monthRows = [...months.values()];
 
   // Insight titles: computed from the data on screen, with fairness rules (insights/).
-  const funnelI = funnelInsight(
-    funnel.data ?? [],
-    outcomes.data ?? [],
-    f.period,
-  );
+  // Ageing: one row per age bucket, split into on schedule and past close date, with reps.
+  const ageBuckets = new Map<string, Row>();
+  const ageReps = new Map<string, Row[]>();
+  for (const r of ageing.data ?? []) {
+    const key = String(r.age_bucket);
+    const row: Row = ageBuckets.get(key) ?? { age_bucket: key };
+    for (const k of ["open_usd", "past_due_usd", "deals", "past_due_deals"])
+      row[k] = num(row[k]) + num(r[k]);
+    row.on_time_usd = num(row.open_usd) - num(row.past_due_usd);
+    ageBuckets.set(key, row);
+    ageReps.set(key, [...(ageReps.get(key) ?? []), r]);
+  }
+  const ageRows = [...ageBuckets.values()];
+
+  const funnelI = leadFunnelInsight(funnel.data ?? [], f.period);
+  const ageI = ageingInsight(ageRows);
+  const velocityI = velocityInsight(velocity.data ?? []);
+  const leads = num(funnel.data?.[0]?.reached);
+  const noDeal = leads - num(funnel.data?.[1]?.reached);
   const channelI = channelInsight(outcomes.data ?? [], f.period);
   const winI = winRateInsight(winBySource.data ?? []);
   const monthI = pipelineByMonthInsight(monthRows, SOURCES, f.period);
@@ -80,50 +99,46 @@ export function PipelinePage() {
     (s) => SOURCE_COLOR[s] ?? "var(--chart-neutral-bar)",
   );
 
-  /** Funnel tooltip for stage index i (rank i + 1). */
+  /** Funnel tooltip for step i: 0 = leads, then each stage (rank i). */
   const funnelDetails = (i: number) => {
-    const stageCount = (k: number) => num(funnel.data?.[k]?.opportunities);
-    const created = stageCount(0);
-    const here = stageCount(i);
-    const at = (outcome: string) =>
-      (gates.data ?? []).filter(
-        (r) => num(r.furthest_stage_rank) === i + 1 && r.outcome === outcome,
-      );
-    const reached = (gates.data ?? []).filter(
-      (r) => num(r.furthest_stage_rank) >= i + 1,
-    );
-    const total = (rows: Row[], k: string) =>
-      rows.reduce((a, r) => a + num(r[k]), 0);
+    const row = (k: number) => funnel.data?.[k];
+    const here = num(row(i)?.reached);
+    const name = (k: number) => (k === 0 ? "leads" : String(row(k)?.stage));
     return [
-      ...(created
-        ? [{ label: "Share of deals created", value: percent(here / created) }]
+      ...(i > 0 && leads
+        ? [{ label: "Share of leads", value: percent(here / leads) }]
         : []),
-      ...(i > 0 && stageCount(i - 1)
+      ...(i > 0 && num(row(i - 1)?.reached)
         ? [
             {
-              label: `Passed from ${cap(funnel.data?.[i - 1]?.stage).toLowerCase()}`,
-              value: percent(here / stageCount(i - 1)),
+              label: `Passed from ${name(i - 1)}`,
+              value: percent(here / num(row(i - 1)?.reached)),
             },
           ]
         : []),
-      ...(i < GATES.length
+      ...(i === 0 && leads ? [{ label: "No deal", value: count(noDeal) }] : []),
+      ...(i > 0 && i <= GATES.length
         ? [
             {
               label: "Lost at this stage",
-              value: `${count(total(at("lost"), "deals"))} · ${currency(total(at("lost"), "amount_usd"))}`,
+              value: `${count(row(i)?.lost_here)} · ${currency(row(i)?.lost_here_usd)}`,
               color: "var(--chart-negative)",
             },
             {
               label: "Still open here",
-              value: `${count(total(at("open"), "deals"))} · ${currency(total(at("open"), "amount_usd"))}`,
+              value: `${count(row(i)?.open_here)} · ${currency(row(i)?.open_here_usd)}`,
               color: "var(--chart-neutral-bar)",
             },
           ]
         : []),
-      {
-        label: "Value of these deals",
-        value: currency(total(reached, "amount_usd")),
-      },
+      ...(i > 0
+        ? [
+            {
+              label: "Value of these deals",
+              value: currency(row(i)?.value_usd),
+            },
+          ]
+        : []),
     ];
   };
 
@@ -175,42 +190,147 @@ export function PipelinePage() {
         />
       </section>
 
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+      <section className="mt-4">
         <ChartCard
           title={funnelI.title}
-          subtitle={`Deals created, ${periodLabel.toLowerCase()}, by the furthest stage they reached`}
+          subtitle={`Leads created, ${periodLabel.toLowerCase()}, followed to their deals. Under each step: what leaked there. Hover a step for more.`}
           query={funnel}
-          isEmpty={!num(funnel.data?.[0]?.opportunities)}
+          isEmpty={!leads}
         >
           <Funnel
             rows={funnel.data ?? []}
             stage="stage"
-            value="opportunities"
-            stageLabel={cap}
-            ariaLabel="Deals by furthest stage reached"
+            value="reached"
+            unit="leads"
+            stageLabel={(v) => (v === "lead" ? "Leads" : cap(v))}
+            ariaLabel="Leads followed to won: count reaching each step"
             details={funnelDetails}
           />
+          <ul
+            className="mt-3 grid grid-cols-6 gap-px"
+            aria-label="Leakage at each step"
+          >
+            {(funnel.data ?? []).map((r, i) => {
+              const leak = r.stage === funnelI.highlight?.stage;
+              return (
+                <li
+                  key={String(r.stage)}
+                  className={`mx-1 rounded-lg border px-2 py-2 text-center ${leak ? "border-brand-accent bg-foreground/5" : ""}`}
+                >
+                  {i === 0 ? (
+                    <>
+                      <div className="font-display text-lg">
+                        {count(noDeal)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        no deal
+                      </div>
+                    </>
+                  ) : i <= GATES.length ? (
+                    <>
+                      <div
+                        className={`font-display text-lg ${leak ? "text-brand-accent" : ""}`}
+                      >
+                        {currency(r.lost_here_usd)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        lost · {count(r.lost_here)} deals
+                      </div>
+                      <div className="mt-1 text-xs text-ink-secondary">
+                        {currency(r.open_here_usd)} still open
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-display text-lg">
+                        {currency(r.value_usd)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        won · {count(r.reached)} deals
+                      </div>
+                      <div className="mt-1 text-xs text-ink-secondary">
+                        {leads ? percent(num(r.reached) / leads) : "–"} of leads
+                      </div>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </ChartCard>
+      </section>
+
+      <section className="mt-4">
         <ChartCard
-          title={winI.title}
-          subtitle={`Won / closed deals by lead source, closed ${periodLabel.toLowerCase()}`}
-          query={winBySource}
+          title={ageI.title}
+          subtitle="Open pipeline as of Oct 31, 2026, by how long ago each deal was created"
+          query={ageing}
+          ignores={skip("pipeline_ageing")}
         >
           <BarBreakdown
-            rows={winBySource.data ?? []}
-            category="lead_source"
-            categoryLabel={cap}
-            value="win_rate"
-            format={(v) => percent(v)}
-            highlight={(r) => r.lead_source === winI.highlight?.lead_source}
-            ariaLabel="Win rate by lead source"
-            details={(r) => [
+            rows={ageRows}
+            category="age_bucket"
+            series={[
               {
-                label: "Won",
-                value: `${count(r.won_opportunities)} of ${count(r.closed_opportunities)} closed`,
+                key: "on_time_usd",
+                label: "On schedule",
+                color: "var(--chart-neutral-bar)",
               },
-              { label: "Value won", value: currency(r.won_usd) },
+              {
+                key: "past_due_usd",
+                label: "Past close date",
+                color: "var(--chart-negative)",
+              },
             ]}
+            format={(v) => currency(v)}
+            ariaLabel="Open pipeline by age, on schedule and past close date"
+            aspectRatio="16 / 5"
+            details={(r) => [
+              { label: "Open deals", value: count(r.deals) },
+              {
+                label: "Past close date",
+                value: `${count(r.past_due_deals)} · ${currency(r.past_due_usd)}`,
+                color: "var(--chart-negative)",
+              },
+              ...(ageReps.get(String(r.age_bucket)) ?? [])
+                .slice(0, 3)
+                .map((x) => ({
+                  label: `${String(x.rep_name)} · ${count(x.deals)}`,
+                  value: currency(x.open_usd),
+                })),
+            ]}
+          />
+          <ul
+            className="mt-3 flex flex-wrap gap-4 text-xs text-ink-secondary"
+            aria-label="Legend"
+          >
+            <li className="flex items-center gap-1.5">
+              <span
+                className="size-2.5 rounded-full"
+                style={{ background: "var(--chart-neutral-bar)" }}
+              />
+              On schedule
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span
+                className="size-2.5 rounded-full"
+                style={{ background: "var(--chart-negative)" }}
+              />
+              Past close date
+            </li>
+          </ul>
+        </ChartCard>
+      </section>
+
+      <section className="mt-4">
+        <ChartCard
+          title={velocityI.title}
+          subtitle={`Sales velocity: open deals today × average won deal × win rate ÷ sales cycle. The last three come from deals closed ${periodLabel.toLowerCase()}. Segment figures don't add up to the total.`}
+          query={velocity}
+        >
+          <VelocityTable
+            rows={velocity.data ?? []}
+            highlight={velocityI.highlight?.segment}
           />
         </ChartCard>
       </section>
@@ -308,27 +428,24 @@ export function PipelinePage() {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={repI.title}
-          subtitle={`Open pipeline as of Oct 31, 2026${repI.highlight ? "; highlighted: the largest past-due share" : ""}`}
-          query={reps}
-          ignores={skip("open_pipeline_by_rep")}
+          title={winI.title}
+          subtitle={`Won / closed deals by lead source, closed ${periodLabel.toLowerCase()}`}
+          query={winBySource}
         >
           <BarBreakdown
-            rows={reps.data ?? []}
-            category="rep_name"
-            value="open_pipeline_usd"
-            format={(v) => currency(v)}
-            highlight={(r) => r.owner_id === repI.highlight?.owner_id}
-            horizontal
-            aspectRatio="4 / 3"
-            ariaLabel="Open pipeline by rep"
+            rows={winBySource.data ?? []}
+            category="lead_source"
+            categoryLabel={cap}
+            value="win_rate"
+            format={(v) => percent(v)}
+            highlight={(r) => r.lead_source === winI.highlight?.lead_source}
+            ariaLabel="Win rate by lead source"
             details={(r) => [
-              { label: "Open deals", value: count(r.deals) },
               {
-                label: "Past close date",
-                value: `${count(r.past_due_deals)} · ${currency(r.past_due_pipeline_usd)}`,
+                label: "Won",
+                value: `${count(r.won_opportunities)} of ${count(r.closed_opportunities)} closed`,
               },
-              { label: "Past-due share", value: percent(r.past_due_share) },
+              { label: "Value won", value: currency(r.won_usd) },
             ]}
           />
         </ChartCard>
@@ -350,6 +467,34 @@ export function PipelinePage() {
                 label: "Stage entries measured",
                 value: count(r.stage_entries),
               },
+            ]}
+          />
+        </ChartCard>
+      </section>
+
+      <section className="mt-4">
+        <ChartCard
+          title={repI.title}
+          subtitle={`Open pipeline as of Oct 31, 2026${repI.highlight ? "; highlighted: the largest past-due share" : ""}`}
+          query={reps}
+          ignores={skip("open_pipeline_by_rep")}
+        >
+          <BarBreakdown
+            rows={reps.data ?? []}
+            category="rep_name"
+            value="open_pipeline_usd"
+            format={(v) => currency(v)}
+            highlight={(r) => r.owner_id === repI.highlight?.owner_id}
+            horizontal
+            aspectRatio="16 / 6"
+            ariaLabel="Open pipeline by rep"
+            details={(r) => [
+              { label: "Open deals", value: count(r.deals) },
+              {
+                label: "Past close date",
+                value: `${count(r.past_due_deals)} · ${currency(r.past_due_pipeline_usd)}`,
+              },
+              { label: "Past-due share", value: percent(r.past_due_share) },
             ]}
           />
         </ChartCard>

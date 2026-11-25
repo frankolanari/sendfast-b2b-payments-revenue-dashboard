@@ -26,30 +26,6 @@ function totals(outcomes: Row[]) {
   };
 }
 
-export function funnelInsight(
-  funnel: Row[],
-  outcomes: Row[],
-  period: PeriodKey,
-): Insight {
-  const created = num(
-    funnel.find((r) => num(r.stage_rank) === 1)?.opportunities,
-  );
-  const won = num(funnel.find((r) => r.stage === "won")?.opportunities);
-  if (!created) return { title: `No deals were created ${inPeriod[period]}` };
-  if (created < MIN_SAMPLE)
-    return {
-      title: `Only ${plural(created, "deal")} created ${inPeriod[period]}: ${won} won so far`,
-    };
-  const t = totals(outcomes);
-  if (t.deals && t.open / t.deals > STILL_OPEN_SHARE)
-    return {
-      title: `${percent(t.open / t.deals, 0)} of deals created ${inPeriod[period]} are still open; ${percent(won / created, 0)} won so far`,
-    };
-  return {
-    title: `${percent(won / created)} of deals created ${inPeriod[period]} reach won`,
-  };
-}
-
 export function winRateInsight(rows: Row[]): Insight {
   if (!rows.length) return { title: "No closed deals in this view" };
   if (rows.length === 1) {
@@ -192,5 +168,87 @@ export function stageDaysInsight(rows: Row[]): Insight {
   return {
     title: `Deals wait longest in ${String(slow.stage)}: ${days(Math.round(num(slow.median_days_in_stage) * 10) / 10)} at the median`,
     highlight: slow,
+  };
+}
+
+/** The stage with the most lost value, when there are enough lost deals to rank stages. */
+export function biggestLeak(rows: Row[]): Row | undefined {
+  const stages = rows.filter(
+    (r) => num(r.stage_rank) >= 1 && num(r.stage_rank) <= 4,
+  );
+  const lost = stages.reduce((a, r) => a + num(r.lost_here), 0);
+  const top = pickBy(stages, "lost_here_usd", "max");
+  return lost >= MIN_SAMPLE && top && num(top.lost_here_usd) > 0
+    ? top
+    : undefined;
+}
+
+/** Lead -> won funnel with leakage: leads created in the period, followed to their deals. */
+export function leadFunnelInsight(rows: Row[], period: PeriodKey): Insight {
+  const at = (rank: number, key = "reached") =>
+    num(rows.find((r) => num(r.stage_rank) === rank)?.[key]);
+  const leads = at(0);
+  if (!leads) return { title: `No leads were created ${inPeriod[period]}` };
+  const deals = at(1);
+  const won = at(5);
+  if (leads < MIN_SAMPLE)
+    return {
+      title: `Only ${plural(leads, "lead")} created ${inPeriod[period]}: ${deals} became deals, ${won} won so far`,
+    };
+  const open = [1, 2, 3, 4].reduce((a, k) => a + at(k, "open_here"), 0);
+  const noDeal = `${percent((leads - deals) / leads, 0)} of leads created ${inPeriod[period]} have no deal`;
+  if (deals && open / deals > STILL_OPEN_SHARE)
+    return {
+      title: `${noDeal}; ${percent(open / deals, 0)} of the deals are still open`,
+    };
+  const leak = biggestLeak(rows);
+  if (!leak)
+    return { title: `${noDeal}; ${percent(won / leads)} of all leads are won` };
+  return {
+    title: `${noDeal}; ${String(leak.stage)} leaks the most, ${currency(leak.lost_here_usd)} lost`,
+    highlight: leak,
+  };
+}
+
+/** Decay: how much open pipeline is old. Buckets come from the mart (age_bucket). */
+export function ageingInsight(buckets: Row[]): Insight {
+  const sum = (rows: Row[], k: string) =>
+    rows.reduce((a, r) => a + num(r[k]), 0);
+  const total = sum(buckets, "open_usd");
+  if (!buckets.length || !total)
+    return { title: "No open pipeline in this view" };
+  const old = buckets.filter((r) => r.age_bucket === "Over 90 days");
+  const oldUsd = sum(old, "open_usd");
+  const pastDue = sum(buckets, "past_due_usd");
+  if (!oldUsd)
+    return {
+      title: pastDue
+        ? `No open deal is older than 90 days; ${currency(pastDue)} is past its close date`
+        : "No open deal is older than 90 days or past its close date",
+    };
+  const late = sum(old, "past_due_usd");
+  return {
+    title: `${currency(oldUsd)}, ${percent(oldUsd / total, 0)} of open pipeline, is over 90 days old${late ? `; ${currency(late)} of it is past its close date` : ""}`,
+  };
+}
+
+/** Sales velocity; the first row with segment 'all' is the whole view. */
+export function velocityInsight(rows: Row[]): Insight {
+  const all = rows.find((r) => r.segment === "all");
+  if (!all || num(all.closed_deals) < MIN_SAMPLE)
+    return {
+      title: `Too few closed deals to measure sales velocity (under ${MIN_SAMPLE})`,
+    };
+  if (!num(all.velocity_usd_per_day))
+    return { title: "No open pipeline to measure velocity on" };
+  const headline = `Open pipeline turns into ${currency(all.velocity_usd_per_day)} of won revenue a day`;
+  const sized = rows.filter(
+    (r) => r.segment !== "all" && num(r.closed_deals) >= MIN_SAMPLE,
+  );
+  if (sized.length < 2) return { title: headline };
+  const best = pickBy(sized, "velocity_usd_per_day", "max")!;
+  return {
+    title: `${headline}; by segment, ${best.segment === "smb" ? "SMB" : cap(best.segment).toLowerCase()} is highest at ${currency(best.velocity_usd_per_day)}`,
+    highlight: best,
   };
 }
