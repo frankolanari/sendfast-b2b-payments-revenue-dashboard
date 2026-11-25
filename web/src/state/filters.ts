@@ -6,6 +6,7 @@
 import { useSyncExternalStore } from "react";
 import { cards, type CardSlug } from "@/api/cards.generated";
 import type { CardParams } from "@/api/client";
+import { isDimension, type Dimension } from "@/lib/groups";
 
 export const PERIODS = {
   t12: { label: "Last 12 months", from: "2025-11-01", to: "2026-10-31" },
@@ -22,8 +23,15 @@ export interface Filters {
   lead_source?: string;
   owner_id?: string;
   corridor?: string;
+  /** Chart view choices (how a card groups its rows): kept in the URL, never sent to cards. */
+  velocity_by?: Dimension;
+  outcome_by?: Dimension;
 }
-export type FilterKey = Exclude<keyof Filters, "period">;
+const VIEW_KEYS = ["velocity_by", "outcome_by"] as const;
+export type FilterKey = Exclude<
+  keyof Filters,
+  "period" | (typeof VIEW_KEYS)[number]
+>;
 const FILTER_KEYS: FilterKey[] = [
   "segment",
   "lead_source",
@@ -41,6 +49,10 @@ export function parseFilters(search: string): Filters {
     const v = q.get(k);
     if (v) f[k] = v;
   }
+  for (const k of VIEW_KEYS) {
+    const v = q.get(k);
+    if (isDimension(v)) f[k] = v;
+  }
   return f;
 }
 
@@ -48,6 +60,7 @@ export function serializeFilters(f: Filters): string {
   const q = new URLSearchParams();
   if (f.period !== DEFAULT_PERIOD) q.set("period", f.period);
   for (const k of FILTER_KEYS) if (f[k]) q.set(k, f[k]!);
+  for (const k of VIEW_KEYS) if (f[k]) q.set(k, f[k]!);
   const s = q.toString();
   return s ? `?${s}` : "";
 }

@@ -72,3 +72,16 @@ describe("ignoredFilters", () => {
     );
   });
 });
+
+describe("chart view choices", () => {
+  it("live in the URL beside the filters, ignore junk, and never reach a card", () => {
+    const f = parseFilters("?segment=smb&velocity_by=rep&outcome_by=moon");
+    expect(f).toEqual({ period: "t12", segment: "smb", velocity_by: "rep" });
+    expect(parseFilters(serializeFilters(f))).toEqual(f);
+    expect(Object.keys(cardParams("sales_velocity", f))).toEqual([
+      "date_from",
+      "date_to",
+      "segment",
+    ]);
+  });
+});

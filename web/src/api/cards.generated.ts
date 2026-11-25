@@ -177,21 +177,8 @@ export const cards = {
     ],
     "required": []
   },
-  "deal_gates": {
-    "name": "Deals through the stage gates",
-    "collection": "Pipeline",
-    "display": "table",
-    "params": [
-      "date_from",
-      "date_to",
-      "segment",
-      "lead_source",
-      "owner_id"
-    ],
-    "required": []
-  },
-  "deal_outcomes_by_source": {
-    "name": "Deal outcomes by lead source",
+  "deal_outcomes": {
+    "name": "Deal outcomes by group",
     "collection": "Pipeline",
     "display": "table",
     "params": [
@@ -499,7 +486,7 @@ export const cards = {
     "required": []
   },
   "sales_velocity": {
-    "name": "Sales velocity by segment",
+    "name": "Sales velocity by group",
     "collection": "Pipeline",
     "display": "table",
     "params": [

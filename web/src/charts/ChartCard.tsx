@@ -15,6 +15,7 @@ export function ChartCard({
   isEmpty,
   className,
   ignores,
+  actions,
   children,
 }: {
   /** What the chart is, in a few words: "Sales funnel". */
@@ -28,6 +29,8 @@ export function ChartCard({
   className?: string;
   /** Active filters this chart can't apply (state/filters ignoredFilters). */
   ignores?: string[];
+  /** Controls that change how this chart reads (e.g. Group by). */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const empty =
@@ -57,6 +60,7 @@ export function ChartCard({
             Not affected by {ignores.join(", ")}
           </p>
         )}
+        {actions && <div className="mt-3">{actions}</div>}
       </header>
       <div className="relative flex-1">
         {query.isPending ? (

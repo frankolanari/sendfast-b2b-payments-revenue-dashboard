@@ -25,6 +25,12 @@ furthest as (
 
 ),
 
+reps as (
+
+    select * from {{ ref('dim_reps') }}
+
+),
+
 dated as (
 
     select
@@ -32,6 +38,9 @@ dated as (
         opportunities.account_id,
         opportunities.owner_id,
         accounts.segment,
+        accounts.industry,
+        reps.name as rep_name,
+        reps.team as rep_team,
         coalesce(opportunities.lead_source, 'unknown') as lead_source,
         opportunities.amount_usd,
         opportunities.created_at,
@@ -42,6 +51,8 @@ dated as (
         opportunities.is_won,
         furthest.furthest_stage_rank
     from opportunities
+    left join reps
+        on opportunities.owner_id = reps.rep_id
     left join furthest
         on opportunities.opportunity_id = furthest.opportunity_id
     inner join accounts
@@ -55,6 +66,9 @@ select
     account_id,
     owner_id,
     segment,
+    industry,
+    rep_name,
+    rep_team,
     lead_source,
     amount_usd,
     created_at,

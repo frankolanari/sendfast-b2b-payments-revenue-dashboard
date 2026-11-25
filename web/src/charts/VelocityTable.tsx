@@ -1,24 +1,32 @@
 import type { Row } from "@/api/useCard";
-import { cap, num } from "@/insights/common";
+import { MIN_SAMPLE, num } from "@/insights/common";
 import { count, currency, days, percent } from "@/lib/format";
 
 /**
- * Sales velocity and the four things that drive it, per segment: open deals x average won deal
- * x win rate / sales cycle. A table, because the drivers are in different units; the bar in the
- * last column compares velocity.
+ * Sales velocity and the four things that drive it, per group: open deals x average won deal x
+ * win rate / sales cycle. A table, because the drivers are in different units; the bar in the
+ * last column compares velocity. Groups with too few closed deals are dimmed, not ranked.
  */
 export function VelocityTable({
+  total,
   rows,
+  groupLabel,
   highlight,
 }: {
+  total?: Row;
   rows: Row[];
+  groupLabel: string;
   highlight?: unknown;
 }) {
+  const ranked = (r: Row) => num(r.closed_deals) >= MIN_SAMPLE;
+  const sorted = [...rows].sort(
+    (a, b) =>
+      Number(ranked(b)) - Number(ranked(a)) ||
+      num(b.velocity_usd_per_day) - num(a.velocity_usd_per_day),
+  );
   const max = Math.max(
     1,
-    ...rows
-      .filter((r) => r.segment !== "all")
-      .map((r) => num(r.velocity_usd_per_day)),
+    ...sorted.filter(ranked).map((r) => num(r.velocity_usd_per_day)),
   );
   const head = "px-3 py-2 text-right font-medium text-muted-foreground";
   const cell = "px-3 py-3 text-right tabular-nums";
@@ -26,7 +34,7 @@ export function VelocityTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <caption className="sr-only">
-          Sales velocity and its drivers by segment
+          Sales velocity and its drivers by {groupLabel.toLowerCase()}
         </caption>
         <thead>
           <tr className="border-b">
@@ -34,7 +42,7 @@ export function VelocityTable({
               scope="col"
               className="px-3 py-2 text-left font-medium text-muted-foreground"
             >
-              Segment
+              {groupLabel}
             </th>
             <th scope="col" className={head}>
               Open deals
@@ -54,18 +62,26 @@ export function VelocityTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
-            const all = r.segment === "all";
-            const share = all ? 0 : num(r.velocity_usd_per_day) / max;
+          {[...(total ? [total] : []), ...sorted].map((r) => {
+            const all = r === total;
+            const small = !all && !ranked(r);
+            const share = all || small ? 0 : num(r.velocity_usd_per_day) / max;
             return (
               <tr
-                key={String(r.segment)}
+                key={all ? "__all" : String(r.grp)}
                 className={
-                  all ? "border-b font-medium" : "border-b border-border/60"
+                  all
+                    ? "border-b font-medium"
+                    : `border-b border-border/60 ${small ? "text-muted-foreground" : ""}`
                 }
               >
                 <th scope="row" className="px-3 py-3 text-left font-medium">
-                  {all ? "All segments" : cap(r.segment)}
+                  {all ? "All" : String(r.label)}
+                  {small && (
+                    <span className="ml-2 text-xs font-normal">
+                      too few to rank
+                    </span>
+                  )}
                 </th>
                 <td className={cell}>{count(r.open_deals)}</td>
                 <td className={cell}>{currency(r.avg_won_usd)}</td>
@@ -95,7 +111,7 @@ export function VelocityTable({
                           style={{
                             width: `${share * 100}%`,
                             background:
-                              r.segment === highlight
+                              r.grp === highlight
                                 ? "var(--brand-accent)"
                                 : "var(--chart-neutral-bar)",
                           }}

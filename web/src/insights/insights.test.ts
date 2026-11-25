@@ -19,13 +19,15 @@ import {
 } from "./revenue";
 
 const outcome = (
-  lead_source: string,
+  grp: string,
   deals: number,
   won: number,
   still_open: number,
   open_usd: number,
 ) => ({
-  lead_source,
+  grp,
+  label: grp.charAt(0).toUpperCase() + grp.slice(1),
+  inline: grp,
   deals,
   won,
   still_open,
@@ -226,27 +228,29 @@ describe("lead funnel with leakage, ageing, velocity", () => {
       "No open deal is older than 90 days or past its close date",
     );
   });
-  it("velocity: headline, fastest segment, and small samples", () => {
-    const all = {
-      segment: "all",
-      closed_deals: 426,
-      velocity_usd_per_day: 47050,
-    };
-    const ent = {
-      segment: "enterprise",
-      closed_deals: 71,
-      velocity_usd_per_day: 28847,
-    };
-    const smb = {
-      segment: "smb",
-      closed_deals: 205,
-      velocity_usd_per_day: 3837,
-    };
-    expect(velocityInsight([all, smb, ent]).highlight).toBe(ent);
-    expect(velocityInsight([all, smb]).title).toBe(
+  it("velocity: headline, fastest group, and small samples", () => {
+    const total = { closed_deals: 426, velocity_usd_per_day: 47050 };
+    const g = (grp: string, closed_deals: number, v: number) => ({
+      grp,
+      inline: grp,
+      closed_deals,
+      velocity_usd_per_day: v,
+    });
+    const groups = [
+      g("smb", 205, 3837),
+      g("enterprise", 71, 28847),
+      g("tiny", 3, 99999),
+      g("unknown", 50, 99999),
+    ];
+    const i = velocityInsight(total, groups, "segment");
+    expect(i.highlight?.grp).toBe("enterprise");
+    expect(i.title).toBe(
+      "Open pipeline turns into $47.1K of won revenue a day; by segment, enterprise is highest at $28.8K",
+    );
+    expect(velocityInsight(total, [groups[0]]).title).toBe(
       "Open pipeline turns into $47.1K of won revenue a day",
     );
-    expect(velocityInsight([{ ...all, closed_deals: 3 }]).title).toMatch(
+    expect(velocityInsight({ ...total, closed_deals: 3 }).title).toMatch(
       /Too few/,
     );
   });

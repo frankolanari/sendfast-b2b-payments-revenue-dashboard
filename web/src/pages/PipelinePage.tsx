@@ -8,6 +8,7 @@ import { KpiTile } from "@/charts/KpiTile";
 import { Sankey } from "@/charts/Sankey";
 import { VelocityTable } from "@/charts/VelocityTable";
 import { FilterBar } from "@/components/FilterBar";
+import { GroupBy } from "@/components/GroupBy";
 import { cap, num } from "@/insights/common";
 import {
   channelInsight,
@@ -21,6 +22,7 @@ import {
   winRateInsight,
 } from "@/insights/pipeline";
 import { count, currency, days, month, percent } from "@/lib/format";
+import { DIMENSIONS, groupRows } from "@/lib/groups";
 import {
   cardParams,
   ignoredFilters,
@@ -38,7 +40,7 @@ const SOURCE_COLOR: Record<string, string> = {
 };
 
 export function PipelinePage() {
-  const [f] = useFilters();
+  const [f, set] = useFilters();
   const p = (slug: CardSlug) => cardParams(slug, f);
   const skip = (...slugs: CardSlug[]) => ignoredFilters(slugs, f);
   const periodLabel = PERIODS[f.period].label;
@@ -46,11 +48,7 @@ export function PipelinePage() {
   const funnel = useCard("lead_funnel", p("lead_funnel"));
   const ageing = useCard("pipeline_ageing", p("pipeline_ageing"));
   const velocity = useCard("sales_velocity", p("sales_velocity"));
-  const gates = useCard("deal_gates", p("deal_gates"));
-  const outcomes = useCard(
-    "deal_outcomes_by_source",
-    p("deal_outcomes_by_source"),
-  );
+  const outcomes = useCard("deal_outcomes", p("deal_outcomes"));
   const winBySource = useCard("win_rate_by_source", p("win_rate_by_source"));
   const byMonth = useCard("pipeline_by_month", p("pipeline_by_month"));
   const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
@@ -84,19 +82,35 @@ export function PipelinePage() {
 
   const funnelI = leadFunnelInsight(funnel.data ?? [], f.period);
   const ageI = ageingInsight(ageRows);
-  const velocityI = velocityInsight(velocity.data ?? []);
+  const velocityBy = f.velocity_by ?? "segment";
+  const velocityTotal = velocity.data?.find((r) => r.dimension === "all");
+  const velocityGroups = groupRows(velocity.data ?? [], velocityBy);
+  const velocityI = velocityInsight(
+    velocityTotal,
+    velocityGroups,
+    DIMENSIONS[velocityBy].label.toLowerCase(),
+  );
   const leads = num(funnel.data?.[0]?.reached);
   const noDeal = leads - num(funnel.data?.[1]?.reached);
-  const channelI = channelInsight(outcomes.data ?? [], f.period);
+  const outcomeBy = f.outcome_by ?? "lead_source";
+  const outcomeGroups = groupRows(outcomes.data ?? [], outcomeBy);
+  const channelI = channelInsight(
+    outcomeGroups,
+    f.period,
+    DIMENSIONS[outcomeBy].plural,
+  );
   const winI = winRateInsight(winBySource.data ?? []);
   const monthI = pipelineByMonthInsight(monthRows, SOURCES, f.period);
   const repI = repInsight(reps.data ?? []);
   const stageI = stageDaysInsight(stageDays.data ?? []);
+  // Groups without their own hue (reps, industries) show the highlighted one in blue.
   const flow = buildOutcomeFlow(
-    gates.data ?? [],
-    SOURCES,
-    cap,
-    (s) => SOURCE_COLOR[s] ?? "var(--chart-neutral-bar)",
+    outcomeGroups.map((r) =>
+      r.color === "var(--chart-neutral-bar)" &&
+      r.grp === channelI.highlight?.grp
+        ? { ...r, color: "var(--chart-1)" }
+        : r,
+    ),
   );
 
   /** Funnel tooltip for step i: 0 = leads, then each stage (rank i). */
@@ -328,45 +342,63 @@ export function PipelinePage() {
         <ChartCard
           name="Sales velocity"
           insight={velocityI.title}
-          note={`Open deals today × average won deal × win rate ÷ sales cycle. The last three come from deals closed ${periodLabel.toLowerCase()}. Segment figures don't add up to the total.`}
+          note={`Open deals today × average won deal × win rate ÷ sales cycle. The last three come from deals closed ${periodLabel.toLowerCase()}. Group figures don't add up to the total.`}
           query={velocity}
+          actions={
+            <GroupBy
+              name="Sales velocity"
+              value={velocityBy}
+              onChange={(d) => set({ velocity_by: d })}
+            />
+          }
         >
           <VelocityTable
-            rows={velocity.data ?? []}
-            highlight={velocityI.highlight?.segment}
+            total={velocityTotal}
+            rows={velocityGroups}
+            groupLabel={DIMENSIONS[velocityBy].label}
+            highlight={velocityI.highlight?.grp}
           />
         </ChartCard>
       </section>
 
       <section className="mt-4">
         <ChartCard
-          name="Channel outcomes"
+          name="Deal outcomes"
           insight={channelI.title}
-          note={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${leakNote(gates.data ?? [], channelI.highlight, GATES)}`}
-          query={gates}
+          note={`Deals created, ${periodLabel.toLowerCase()}, by ${DIMENSIONS[outcomeBy].label.toLowerCase()} and where they ended up.${leakNote(channelI.highlight, GATES)}`}
+          query={outcomes}
+          isEmpty={outcomes.data !== undefined && !outcomeGroups.length}
+          actions={
+            <GroupBy
+              name="Deal outcomes"
+              value={outcomeBy}
+              onChange={(d) => set({ outcome_by: d })}
+            />
+          }
         >
           <Sankey
+            key={outcomeBy}
             nodes={flow.nodes}
             links={flow.links}
-            ariaLabel="Deals by lead source and outcome: won, still open or lost"
-            aspectRatio="16 / 6"
+            ariaLabel="Deals by group and outcome: won, still open or lost"
+            aspectRatio={outcomeGroups.length > 6 ? "16 / 10" : "16 / 6"}
           />
-          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {(outcomes.data ?? []).map((r) => (
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {outcomeGroups.map((r) => (
               <div
-                key={String(r.lead_source)}
+                key={String(r.grp)}
                 className={
-                  r.lead_source === channelI.highlight?.lead_source
+                  r.grp === channelI.highlight?.grp
                     ? "rounded-lg border border-brand-accent/60 bg-foreground/5 px-3 py-2"
                     : "rounded-lg border px-3 py-2"
                 }
               >
                 <dt className="flex items-center gap-1.5 text-xs text-ink-secondary">
                   <span
-                    className="size-2 rounded-full"
-                    style={{ background: SOURCE_COLOR[String(r.lead_source)] }}
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ background: String(r.color) }}
                   />
-                  {cap(r.lead_source)}
+                  {String(r.label)}
                 </dt>
                 <dd className="mt-1 text-sm">
                   <span className="font-medium">{percent(r.won_share, 0)}</span>

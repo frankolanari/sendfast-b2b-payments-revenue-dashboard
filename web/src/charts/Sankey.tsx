@@ -37,7 +37,11 @@ export function Sankey({
           value,
         })),
       }}
-      margin={{ left: 90, right: 90 }}
+      // Room for the longest group name on the left (rep names, industries).
+      margin={{
+        left: Math.max(90, 8 * Math.max(...nodes.map((n) => n.name.length), 0)),
+        right: 90,
+      }}
     >
       <SankeyLink
         getLinkColor={(_, i) => links[i]?.color ?? "var(--chart-neutral-bar)"}
@@ -59,7 +63,7 @@ export function Sankey({
               total={`${count(l.value)} deals`}
               rows={[
                 {
-                  label: `Share of ${nodes[l.source].name.toLowerCase()} deals`,
+                  label: "Share of this group's deals",
                   value: percent(l.value / fromSource),
                 },
                 { label: "Share of all deals", value: percent(l.value / all) },

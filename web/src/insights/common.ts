@@ -16,6 +16,10 @@ export const cap = (v: unknown) => {
     : s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+/** A group whose key is missing CRM data is never ranked. */
+export const knownGroups = (rows: Row[]) =>
+  rows.filter((r) => r.grp !== "unknown");
+
 /** "unknown" is a missing CRM value, not a lead source: insights never rank it. */
 export const knownSources = (rows: Row[]) =>
   rows.filter((r) => r.lead_source !== "unknown");

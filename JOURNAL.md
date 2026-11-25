@@ -337,6 +337,15 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: name / finding / note hierarchy for every chart card. Specific: the names chosen.
 **Tags:** #linkedin #x #skill
 
+## 2026-11-25 · Stage 7 · Owner: make it a dashboard, not a presentation (Group by)
+**Type:** decision
+**What happened:** The owner asked to regroup Sales velocity, then Deal outcomes too: "we can have more of a dashboard than a presentation, because you allow people to interact with it better". Both cards now switch between segment, lead source, rep, team and industry (country left out: 3 of 12 countries have under 10 closed deals). The choice is kept in the URL beside the filters.
+**How:** each card returns every grouping in one result (a `dimension` column), so the shared filter contract didn't change and the switch is instant. Groups under 10 closed deals are dimmed and never ranked; dimensions with more groups than the palette has hues stay neutral, with only the flagged group coloured. "Channel outcomes" is renamed "Deal outcomes".
+**Numbers:** velocity across all groups still equals the golden $47,050.45; every grouping accounts for all 453 deals.
+**Quotable line:** "A presentation answers the question you picked. A dashboard answers the one the reader has."
+**Generic vs specific (#skill):** generic: return all groupings in one card and switch client-side; keep view choices in the URL; never cycle colours past the palette. Specific: the five dimensions.
+**Tags:** #linkedin #x #article #skill
+
 ---
 
 ## Owner notes

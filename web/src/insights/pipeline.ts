@@ -6,6 +6,7 @@ import {
   cap,
   inPeriod,
   type Insight,
+  knownGroups,
   knownSources,
   MIN_SAMPLE,
   num,
@@ -53,30 +54,35 @@ export function winRateInsight(rows: Row[]): Insight {
   };
 }
 
-/** The source -> outcome Sankey. Returns the weakest source (for highlighting) when fair. */
-export function channelInsight(outcomes: Row[], period: PeriodKey): Insight {
-  const t = totals(outcomes);
+/**
+ * The group -> outcome Sankey. Rows come from lib/groups (label, inline). Highlights the
+ * weakest group only when the comparison is fair.
+ */
+export function channelInsight(
+  groups: Row[],
+  period: PeriodKey,
+  noun = "channels",
+): Insight {
+  const t = totals(groups);
   if (!t.deals) return { title: `No deals were created ${inPeriod[period]}` };
-  if (outcomes.length === 1) {
-    const r = outcomes[0];
+  if (groups.length === 1) {
+    const r = groups[0];
     return {
-      title: `${cap(r.lead_source)}: ${num(r.won)} of ${plural(num(r.deals), "deal")} won so far, ${currency(r.open_usd)} still open`,
+      title: `${String(r.label)}: ${num(r.won)} of ${plural(num(r.deals), "deal")} won so far, ${currency(r.open_usd)} still open`,
     };
   }
   if (t.open / t.deals > STILL_OPEN_SHARE)
     return {
       title: `${num(t.open)} of ${plural(t.deals, "deal")} created ${inPeriod[period]} are still open, worth ${currency(t.openUsd)}`,
     };
-  const sized = knownSources(outcomes).filter(
-    (r) => num(r.deals) >= MIN_SAMPLE,
-  );
+  const sized = knownGroups(groups).filter((r) => num(r.deals) >= MIN_SAMPLE);
   if (sized.length < 2)
     return {
-      title: `Too few deals to compare channels (under ${MIN_SAMPLE} each)`,
+      title: `Too few deals to compare ${noun} (under ${MIN_SAMPLE} each)`,
     };
   const worst = pickBy(sized, "won_share", "min")!;
   const richest = pickBy(sized, "open_usd", "max")!;
-  const lead = `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)})`;
+  const lead = `${String(worst.label)} deals win least (${percent(worst.won_share, 0)})`;
   if (num(richest.open_usd) <= 0)
     return {
       title: `${lead}; no deals in this view are still open`,
@@ -87,26 +93,20 @@ export function channelInsight(outcomes: Row[], period: PeriodKey): Insight {
     title:
       richest === worst
         ? `${lead} yet hold the most open pipeline (${money})`
-        : `${lead}; ${cap(richest.lead_source).toLowerCase()} holds the most open pipeline (${money})`,
+        : `${lead}; ${String(richest.inline)} holds the most open pipeline (${money})`,
     highlight: worst,
   };
 }
 
-/** Where the weakest source's lost deals stopped, for the Sankey subtitle. */
+/** Where the weakest group's lost deals most often stopped, for the Sankey note. */
 export function leakNote(
-  gates: Row[],
   worst: Row | undefined,
   stages: readonly string[],
 ): string {
-  if (!worst) return "";
-  const lost = gates.filter(
-    (r) => r.lead_source === worst.lead_source && r.outcome === "lost",
-  );
-  const top = pickBy(lost, "deals", "max");
-  if (!top || num(top.deals) < 3) return "";
-  const stage = stages[num(top.furthest_stage_rank) - 1];
+  if (!worst || num(worst.lost) < 3) return "";
+  const stage = stages[num(worst.lost_stage_rank) - 1];
   return stage
-    ? ` Most lost ${String(worst.lead_source)} deals stopped at ${stage.toLowerCase()}.`
+    ? ` ${String(worst.label)}: lost deals most often stopped at ${stage.toLowerCase()}.`
     : "";
 }
 
@@ -232,23 +232,27 @@ export function ageingInsight(buckets: Row[]): Insight {
   };
 }
 
-/** Sales velocity; the first row with segment 'all' is the whole view. */
-export function velocityInsight(rows: Row[]): Insight {
-  const all = rows.find((r) => r.segment === "all");
-  if (!all || num(all.closed_deals) < MIN_SAMPLE)
+/** Sales velocity: the whole view, then the fastest group when there are enough to compare. */
+export function velocityInsight(
+  total: Row | undefined,
+  groups: Row[] = [],
+  dimension = "segment",
+): Insight {
+  if (!total || num(total.closed_deals) < MIN_SAMPLE)
     return {
       title: `Too few closed deals to measure sales velocity (under ${MIN_SAMPLE})`,
     };
-  if (!num(all.velocity_usd_per_day))
+  if (!num(total.velocity_usd_per_day))
     return { title: "No open pipeline to measure velocity on" };
-  const headline = `Open pipeline turns into ${currency(all.velocity_usd_per_day)} of won revenue a day`;
-  const sized = rows.filter(
-    (r) => r.segment !== "all" && num(r.closed_deals) >= MIN_SAMPLE,
+  const headline = `Open pipeline turns into ${currency(total.velocity_usd_per_day)} of won revenue a day`;
+  const sized = knownGroups(groups).filter(
+    (r) => num(r.closed_deals) >= MIN_SAMPLE,
   );
   if (sized.length < 2) return { title: headline };
   const best = pickBy(sized, "velocity_usd_per_day", "max")!;
+  if (!num(best.velocity_usd_per_day)) return { title: headline };
   return {
-    title: `${headline}; by segment, ${best.segment === "smb" ? "SMB" : cap(best.segment).toLowerCase()} is highest at ${currency(best.velocity_usd_per_day)}`,
+    title: `${headline}; by ${dimension}, ${String(best.inline)} is highest at ${currency(best.velocity_usd_per_day)}`,
     highlight: best,
   };
 }
