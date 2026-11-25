@@ -154,6 +154,13 @@ export const cards = {
     "params": [],
     "required": []
   },
+  "cohort_retention_grid": {
+    "name": "Retention by go-live cohort (grid)",
+    "collection": "Revenue",
+    "display": "table",
+    "params": [],
+    "required": []
+  },
   "days_in_stage": {
     "name": "Median days in stage",
     "collection": "Pipeline",
@@ -410,6 +417,21 @@ export const cards = {
       "lead_source"
     ],
     "required": []
+  },
+  "revenue_bridge_period": {
+    "name": "Revenue bridge over the period",
+    "collection": "Revenue",
+    "display": "table",
+    "params": [
+      "date_from",
+      "date_to",
+      "segment",
+      "lead_source"
+    ],
+    "required": [
+      "date_from",
+      "date_to"
+    ]
   },
   "revenue_by_month": {
     "name": "Net revenue by month and component",

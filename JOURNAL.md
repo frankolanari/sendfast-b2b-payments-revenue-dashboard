@@ -306,6 +306,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Watch:** the bundle grew from 69 kB to 323 kB gzipped with every sample on one page; pages will load their charts lazily.
 **Tags:** #skill
 
+## 2026-11-25 · Stage 7 · The cohort heatmap lied about recent cohorts (right-censoring)
+**Type:** problem-fix
+**What happened:** The first Revenue page said "Accounts live in 2025Q4 keep 10% of logos at month 12". An account that went live in December 2025 reaches month 12 only in December 2026, after the as-of date, so `fct_cohort_retention` was dividing by the whole cohort while only the oldest accounts could appear in late months. Every late cell of every recent cohort understated retention. No test caught it; the insight title did, because it picked the most extreme cell. Fix in the mart: `is_complete` is true only when the cohort's latest go-live month plus the months-since-live is on or before the as-of month; the heatmap card shows complete cells only. After the fix the title found the planted story itself: 2025Q1 keeps 31% at month 12 (answer key 0.310345) vs 72% for other quarters.
+**Why it matters:** Second time in this build (after activation days at Stage 6) that a data-window edge produced a confident wrong number. Both were found by looking at an insight on screen, not by a test.
+**Generic vs specific (#skill):** generic: any "months since X" metric is right-censored near the as-of date; flag complete cells in the mart and never let a viz render incomplete ones as values. Specific: go-live cohorts.
+**Tags:** #linkedin #article #skill
+
 ---
 
 ## Owner notes

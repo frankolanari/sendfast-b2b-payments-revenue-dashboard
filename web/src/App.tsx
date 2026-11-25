@@ -4,6 +4,7 @@ import { useState, type MouseEvent } from "react";
 import { applyTheme, saveTheme, storedTheme } from "@/design/theme";
 import type { Mode } from "@/design/tokens";
 import { PipelinePage } from "@/pages/PipelinePage";
+import { RevenuePage } from "@/pages/RevenuePage";
 import { navigate, usePath } from "@/state/filters";
 
 const queryClient = new QueryClient({
@@ -121,6 +122,8 @@ export function App() {
           <div className="mt-6">
             {page.path === "/pipeline" ? (
               <PipelinePage />
+            ) : page.path === "/revenue" ? (
+              <RevenuePage />
             ) : (
               <ComingNext title={page.title} />
             )}
