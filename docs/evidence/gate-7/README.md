@@ -1,7 +1,7 @@
 # Gate 7 evidence: the React dashboard
 
-Screenshots are full pages from the Playwright run of `make gate-7` (static demo mode, full-scale
-synthetic data, dark theme, 1440 px). Owner sign-off: design quality, and every planted story
+Screenshots are full pages from the Playwright run of `make snapshot e2e` (static demo mode,
+full-scale synthetic data, dark theme, 1440 px). Owner sign-off: design quality, and every planted story
 visible.
 
 | Screenshot        | Page                  |

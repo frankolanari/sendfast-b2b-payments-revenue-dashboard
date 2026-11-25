@@ -67,11 +67,28 @@ async function settled(page: Page) {
   ).toHaveCount(0, { timeout: 30_000 });
 }
 
+// Every finite animation has finished (loading shimmers repeat for ever and are gone by now).
+async function drawn(page: Page) {
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (a) =>
+          a.playState !== "running" ||
+          a.effect?.getTiming().iterations === Infinity,
+      ),
+  );
+  // The chart kit also tweens in script, which getAnimations() cannot see.
+  await page.waitForTimeout(2_000);
+}
+
 for (const p of PAGES) {
   test(`${p.name}: every chart renders with no console errors`, async ({
     page,
   }) => {
     const errors = watchConsole(page);
+    // Charts animate in; without this the evidence screenshot catches them half drawn.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(p.path);
     for (const chart of p.charts) {
       const heading = page.getByRole("heading", {
@@ -85,6 +102,7 @@ for (const p of PAGES) {
     await expect(
       page.getByText(/couldn.t load|isn.t in the static demo/i),
     ).toHaveCount(0);
+    await drawn(page);
     await page.screenshot({
       path: `test-results/screens/${p.name}.png`,
       fullPage: true,

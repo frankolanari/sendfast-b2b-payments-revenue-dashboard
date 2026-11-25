@@ -374,6 +374,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: before blaming code for a timing failure, check sleep logs, swap and neighbouring containers; never raise a gate's limit to pass it. Specific: Metabase on a laptop.
 **Tags:** #skill
 
+## 2026-11-25 · Stage 7 · Green browser tests, useless screenshots
+**Type:** surprise
+**What happened:** CI passed all 10 checks on PR #9 (cb7d7c5); in its logs the Metabase bootstrap took 14.3 s against the 180 s limit, the 8 browser tests passed and Lighthouse accessibility was 100 on all four pages. Looking at the local screenshots meant for the design sign-off, though, bars were half grown and lines drawn only to February: the test captured the charts mid-animation. They also came from a snapshot built on 0.1-scale data, while the evidence notes claimed full scale. Neither was visible to any check, since the tests assert that charts exist and the console is clean. Fix: the screenshot test asks for reduced motion and waits for animations to finish; the snapshot was re-exported at full scale and all six planted stories checked by eye in the new images.
+**Why it matters:** An evidence file nobody opens proves nothing. Look at every image before asking someone to approve it.
+**Generic vs specific (#skill):** generic: wait for animations before visual captures; stamp or check the data scale behind any evidence. Specific: the chart kit's wipe-in animations.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -415,3 +422,4 @@ _(Your own words, any time. Rough is fine.)_
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
 | 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
 | 6 Metabase | 2026-11-24 | 2026-11-24 | 2 | stale API key within one make run; activation clipped by the window |
+| 7 Front end | 2026-11-24 | pending (CI green) | 3 so far | e2e picked up by unit runner; two slow-laptop timeouts |
