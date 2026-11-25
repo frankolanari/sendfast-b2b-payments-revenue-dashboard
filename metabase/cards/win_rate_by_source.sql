@@ -7,7 +7,9 @@
 select
     lead_source,
     avg(case when is_won then 1.0 else 0.0 end) as win_rate,
-    count(*) as closed_opportunities
+    count(*) as closed_opportunities,
+    sum(case when is_won then 1 else 0 end) as won_opportunities,
+    coalesce(sum(amount_usd) filter (where is_won), 0) as won_usd
 from analytics.fct_opportunities
 where is_closed
   [[ and close_date >= {{date_from}} ]]

@@ -6,7 +6,8 @@
 select
     cast(date_trunc('month', created_date) as date) as month,
     lead_source,
-    coalesce(sum(amount_usd), 0) as pipeline_created_usd
+    coalesce(sum(amount_usd), 0) as pipeline_created_usd,
+    count(*) as opportunities
 from analytics.fct_opportunities
 where 1 = 1
   [[ and created_date >= {{date_from}} ]]

@@ -159,6 +159,17 @@ models:
         description: True when every account in the cohort had reached this month by the as-of date; false cells are right-censored.
         data_tests: [not_null]
 
+  - name: fct_cohort_account_months
+    description: Account x month since go-live; the grain behind fct_cohort_retention.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: { combination_of_columns: [account_id, months_since_live] }
+    columns:
+      - name: account_id
+        data_tests: [not_null]
+      - name: months_since_live
+        data_tests: [not_null]
+
   - name: fct_account_health_monthly
     data_tests:
       - unique_combination_of_columns:

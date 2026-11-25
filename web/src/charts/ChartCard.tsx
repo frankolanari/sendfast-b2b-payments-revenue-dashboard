@@ -12,6 +12,7 @@ export function ChartCard({
   query,
   isEmpty,
   className,
+  ignores,
   children,
 }: {
   title: ReactNode;
@@ -19,6 +20,8 @@ export function ChartCard({
   query: Pick<UseQueryResult<unknown[]>, "isPending" | "isError" | "data">;
   isEmpty?: boolean;
   className?: string;
+  /** Active filters this chart can't apply (state/filters ignoredFilters). */
+  ignores?: string[];
   children: ReactNode;
 }) {
   const empty =
@@ -38,6 +41,11 @@ export function ChartCard({
             title
           )}
         </h2>
+        {ignores && ignores.length > 0 && (
+          <p className="mt-2 inline-block rounded-md border border-brand-accent/50 px-2 py-0.5 text-xs text-ink-secondary">
+            Not affected by {ignores.join(", ")}
+          </p>
+        )}
         {subtitle && (
           <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
         )}

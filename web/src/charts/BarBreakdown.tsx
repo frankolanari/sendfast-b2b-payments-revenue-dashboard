@@ -8,7 +8,10 @@ import {
 } from "@/components/ui/charts";
 import type { Row } from "@/api/useCard";
 import { toNumber } from "@/lib/format";
-import { TooltipBody } from "./TooltipBody";
+import { TooltipBody, type TooltipRow } from "./TooltipBody";
+
+/** Above this many categories (e.g. 24 months), axis labels thin to fit. */
+const MAX_LABELLED_CATEGORIES = 8;
 
 export interface Series {
   key: string;
@@ -36,6 +39,7 @@ export function BarBreakdown({
   aspectRatio,
   categoryLabel = (v) => String(v),
   labelWidth = 120,
+  details,
 }: {
   rows: Row[];
   category: string;
@@ -49,6 +53,8 @@ export function BarBreakdown({
   categoryLabel?: (v: unknown) => string;
   /** Room for category labels on a horizontal chart, in px. */
   labelWidth?: number;
+  /** Tooltip rows for a bar: counts, shares, comparisons. Replaces the default series rows. */
+  details?: (row: Row) => TooltipRow[];
 }) {
   const stacked = Boolean(series);
   const data = rows.map((r) => {
@@ -96,32 +102,36 @@ export function BarBreakdown({
           valueLabelFormatter={(v) => (v ? format(v) : "")}
         />
       ))}
-      {horizontal ? <BarYAxis showAllLabels /> : <BarXAxis showAllLabels />}
+      {horizontal ? (
+        <BarYAxis showAllLabels />
+      ) : (
+        // Short category lists (sources, stages) show every label; long time series thin to the
+        // labels that fit the plot width, so months never collide. The tooltip names every bar.
+        <BarXAxis showAllLabels={data.length <= MAX_LABELLED_CATEGORIES} />
+      )}
       {!horizontal && <BarYAxis numTicks={4} formatValue={(v) => format(v)} />}
       <ChartTooltip
-        content={({ point }) =>
-          stacked ? (
-            <TooltipBody
-              title={String(point.__cat)}
-              total={format(total(point))}
-              // Top of the stack first, as the eye reads it; zero series left out.
-              rows={[...bars]
-                .reverse()
-                .filter((b) => (toNumber(point[b.key]) ?? 0) !== 0)
-                .map((b) => ({
-                  color: b.color,
-                  label: b.label,
-                  value: format(point[b.key]),
-                }))}
-            />
-          ) : (
-            <TooltipBody
-              title={String(point.__cat)}
-              total={format(total(point))}
-              rows={[]}
-            />
-          )
-        }
+        content={({ point }) => (
+          <TooltipBody
+            title={String(point.__cat)}
+            total={format(total(point))}
+            rows={
+              details
+                ? details(point)
+                : stacked
+                  ? // Top of the stack first, as the eye reads it; zero series left out.
+                    [...bars]
+                      .reverse()
+                      .filter((b) => (toNumber(point[b.key]) ?? 0) !== 0)
+                      .map((b) => ({
+                        color: b.color,
+                        label: b.label,
+                        value: format(point[b.key]),
+                      }))
+                  : []
+            }
+          />
+        )}
       />
     </BarChart>
   );

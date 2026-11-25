@@ -158,7 +158,10 @@ export const cards = {
     "name": "Retention by go-live cohort (grid)",
     "collection": "Revenue",
     "display": "table",
-    "params": [],
+    "params": [
+      "segment",
+      "lead_source"
+    ],
     "required": []
   },
   "days_in_stage": {
@@ -168,6 +171,7 @@ export const cards = {
     "params": [
       "date_from",
       "date_to",
+      "segment",
       "lead_source",
       "owner_id"
     ],
@@ -292,7 +296,9 @@ export const cards = {
     "params": [
       "date_from",
       "date_to",
-      "lead_source"
+      "segment",
+      "lead_source",
+      "owner_id"
     ],
     "required": []
   },

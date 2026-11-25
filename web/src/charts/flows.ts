@@ -29,6 +29,7 @@ export interface FlowLink {
   target: number;
   value: number;
   color: string;
+  amount: number;
 }
 
 export function buildOutcomeFlow(
@@ -38,11 +39,13 @@ export function buildOutcomeFlow(
   sourceColor: (s: string) => string,
 ): { nodes: FlowNode[]; links: FlowLink[] } {
   const totals = new Map<string, number>(); // "source|outcome" -> deals
+  const amounts = new Map<string, number>(); // "source|outcome" -> deal value
   for (const r of rows) {
     const n = toNumber(r.deals) ?? 0;
     if (n <= 0) continue;
     const key = `${r.lead_source}|${r.outcome}`;
     totals.set(key, (totals.get(key) ?? 0) + n);
+    amounts.set(key, (amounts.get(key) ?? 0) + (toNumber(r.amount_usd) ?? 0));
   }
   const has = (s: string, o: string) => (totals.get(`${s}|${o}`) ?? 0) > 0;
   const srcs = sources.filter((s) => OUTCOMES.some((o) => has(s, o.key)));
@@ -70,6 +73,7 @@ export function buildOutcomeFlow(
           target: srcs.length + j,
           value,
           color: sourceColor(s),
+          amount: amounts.get(`${s}|${o.key}`) ?? 0,
         });
     }),
   );

@@ -21,7 +21,7 @@ end_rev as (
       [[ and a.lead_source = {{lead_source}} ]]
 ),
 moves as (
-    select category, sum(amount_usd) as amount_usd
+    select category, sum(amount_usd) as amount_usd, sum(account_count) as account_moves
     from analytics.fct_revenue_bridge
     where revenue_month >= cast(date_trunc('month', cast({{date_from}} as date)) as date)
       and revenue_month <= {{date_to}}
@@ -29,13 +29,14 @@ moves as (
       [[ and lead_source = {{lead_source}} ]]
     group by category
 )
-select 'start' as step, 0 as step_order, amount_usd from start_rev
+select 'start' as step, 0 as step_order, amount_usd, cast(null as bigint) as account_moves from start_rev
 union all
 select
     category,
     case category when 'new' then 1 when 'reactivation' then 2 when 'expansion' then 3 when 'contraction' then 4 else 5 end,
-    amount_usd
+    amount_usd,
+    cast(account_moves as bigint)
 from moves
 union all
-select 'end', 9, amount_usd from end_rev
+select 'end', 9, amount_usd, cast(null as bigint) from end_rev
 order by step_order

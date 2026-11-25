@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cardParams, parseFilters, serializeFilters } from "./filters";
+import {
+  cardParams,
+  ignoredFilters,
+  parseFilters,
+  serializeFilters,
+} from "./filters";
 
 describe("URL filters", () => {
   it("round-trips, and the default period stays out of the URL", () => {
@@ -48,5 +53,22 @@ describe("cardParams", () => {
     ).toEqual({
       account_id: "10000006",
     });
+  });
+});
+
+describe("ignoredFilters", () => {
+  it("names the active filters a chart cannot apply", () => {
+    const f = parseFilters("?period=sep2026&owner_id=7&segment=smb");
+    expect(ignoredFilters(["cohort_retention_grid"], f)).toEqual([
+      "period",
+      "rep",
+    ]);
+    expect(ignoredFilters(["open_pipeline_by_rep"], f)).toEqual(["period"]);
+    expect(ignoredFilters(["win_rate"], f)).toEqual([]);
+  });
+  it("says nothing at the default view", () => {
+    expect(ignoredFilters(["cohort_retention_grid"], parseFilters(""))).toEqual(
+      [],
+    );
   });
 });

@@ -313,6 +313,13 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: any "months since X" metric is right-censored near the as-of date; flag complete cells in the mart and never let a viz render incomplete ones as values. Specific: go-live cohorts.
 **Tags:** #linkedin #article #skill
 
+## 2026-11-25 · Stage 7 · Owner audit: titles must hold under any filter, and charts should explain themselves
+**Type:** pushback
+**What happened:** The owner asked for an audit of titles and richer tooltips. Switching 8 filter combinations on both pages showed titles that were true only at the default view: comparing a single source with itself ("Partner deals win least yet hold the most"), win shares for deals too young to close (Sep 2026), "$0 open pipeline" as "the most", rankings from a handful of deals, "0% past due" as a finding, and a cohort chart that ignored every filter. Fix: title logic moved into pure functions (`web/src/insights/`) with fairness rules (at least 2 groups with 10+ records before ranking; still-open share above 35% reported instead of win shares; no highlight when there is nothing to flag), each audit failure now a test. Filters wired where meaningful (cohort chart by segment/lead source through a new account x month mart; days in stage by segment; lead conversion by segment and rep); charts that truly can't apply a filter say "Not affected by ...". Every chart got a detailed tooltip, including the owner's example: a cohort cell shows accounts that went live, still active, revenue that month and to date, NRR and the calendar window.
+**Evidence:** cohort refactor verified identical (116 rows, 0 differences); 41 web tests.
+**Generic vs specific (#skill):** generic: insight titles need sample-size, censoring and degenerate-group rules, tested like any logic; label ignored filters instead of silently ignoring them. Specific: the pipeline and revenue findings.
+**Tags:** #linkedin #article #skill
+
 ---
 
 ## Owner notes

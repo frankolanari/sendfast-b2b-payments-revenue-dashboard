@@ -114,3 +114,23 @@ export function navigate(
   window.scrollTo({ top: 0 });
   notify();
 }
+
+/** Active filters (including a non-default period) that none of a chart's cards accept. */
+export function ignoredFilters(slugs: CardSlug[], f: Filters): string[] {
+  const accepts = new Set<string>(slugs.flatMap((s) => [...cards[s].params]));
+  const out: string[] = [];
+  if (
+    f.period !== DEFAULT_PERIOD &&
+    !accepts.has("date_from") &&
+    !accepts.has("date_to")
+  )
+    out.push("period");
+  const labels: Record<FilterKey, string> = {
+    segment: "segment",
+    lead_source: "lead source",
+    owner_id: "rep",
+    corridor: "corridor",
+  };
+  for (const k of FILTER_KEYS) if (f[k] && !accepts.has(k)) out.push(labels[k]);
+  return out;
+}

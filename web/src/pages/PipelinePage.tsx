@@ -1,3 +1,4 @@
+import type { CardSlug } from "@/api/cards.generated";
 import { useCard, type Row } from "@/api/useCard";
 import { BarBreakdown } from "@/charts/BarBreakdown";
 import { ChartCard } from "@/charts/ChartCard";
@@ -6,8 +7,23 @@ import { Funnel } from "@/charts/Funnel";
 import { KpiTile } from "@/charts/KpiTile";
 import { Sankey } from "@/charts/Sankey";
 import { FilterBar } from "@/components/FilterBar";
-import { currency, days, month, percent, toNumber } from "@/lib/format";
-import { cardParams, PERIODS, useFilters } from "@/state/filters";
+import { cap, num } from "@/insights/common";
+import {
+  channelInsight,
+  funnelInsight,
+  leakNote,
+  pipelineByMonthInsight,
+  repInsight,
+  stageDaysInsight,
+  winRateInsight,
+} from "@/insights/pipeline";
+import { count, currency, days, month, percent } from "@/lib/format";
+import {
+  cardParams,
+  ignoredFilters,
+  PERIODS,
+  useFilters,
+} from "@/state/filters";
 
 const SOURCES = ["inbound", "outbound", "paid", "partner", "unknown"] as const;
 const SOURCE_COLOR: Record<string, string> = {
@@ -17,26 +33,11 @@ const SOURCE_COLOR: Record<string, string> = {
   partner: "var(--chart-4)",
   unknown: "var(--chart-5)",
 };
-const cap = (v: unknown) => {
-  const s = String(v ?? "");
-  return s === "mid_market"
-    ? "Mid-market"
-    : s.charAt(0).toUpperCase() + s.slice(1);
-};
-// Insights compare real sources only: "unknown" is a missing CRM value, not a source.
-const known = (rows: Row[] | undefined) =>
-  (rows ?? []).filter((r) => r.lead_source !== "unknown");
-const by = (rows: Row[] | undefined, key: string, pick: "min" | "max") =>
-  (rows ?? []).reduce<Row | undefined>((best, r) => {
-    const v = toNumber(r[key]);
-    if (v === null) return best;
-    const b = best ? toNumber(best[key]) : null;
-    return b === null || (pick === "max" ? v > b : v < b) ? r : best;
-  }, undefined);
 
 export function PipelinePage() {
   const [f] = useFilters();
-  const p = (slug: Parameters<typeof cardParams>[0]) => cardParams(slug, f);
+  const p = (slug: CardSlug) => cardParams(slug, f);
+  const skip = (...slugs: CardSlug[]) => ignoredFilters(slugs, f);
   const periodLabel = PERIODS[f.period].label;
 
   const funnel = useCard("stage_funnel", p("stage_funnel"));
@@ -50,33 +51,28 @@ export function PipelinePage() {
   const reps = useCard("open_pipeline_by_rep", p("open_pipeline_by_rep"));
   const stageDays = useCard("days_in_stage", p("days_in_stage"));
 
-  // Channel story: which source wins least, which holds the most money still in play, and at
-  // which gate the weakest source loses most deals. Sources with too few deals are left out.
-  const sized = known(outcomes.data).filter(
-    (r) => (toNumber(r.deals) ?? 0) >= 10,
+  // Pipeline by month: pivot (month, source) rows into one row per month, keeping deal counts.
+  const months = new Map<string, Row>();
+  for (const r of byMonth.data ?? []) {
+    const m = String(r.month);
+    const row = months.get(m) ?? { month: m };
+    row[String(r.lead_source)] = num(r.pipeline_created_usd);
+    row[`${r.lead_source}__n`] = num(r.opportunities);
+    months.set(m, row);
+  }
+  const monthRows = [...months.values()];
+
+  // Insight titles: computed from the data on screen, with fairness rules (insights/).
+  const funnelI = funnelInsight(
+    funnel.data ?? [],
+    outcomes.data ?? [],
+    f.period,
   );
-  const worst = by(sized, "won_share", "min");
-  const richest = by(sized, "open_usd", "max");
-  const leak = worst
-    ? by(
-        (gates.data ?? []).filter(
-          (r) => r.lead_source === worst.lead_source && r.outcome === "lost",
-        ),
-        "deals",
-        "max",
-      )
-    : undefined;
-  const leakGate = leak
-    ? GATES[(toNumber(leak.furthest_stage_rank) ?? 1) - 1]
-    : undefined;
-  const flowTitle = !worst
-    ? "How deals from each channel end up"
-    : richest && richest.lead_source === worst.lead_source
-      ? `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}) yet hold the most open pipeline (${currency(worst.open_usd)})`
-      : `${cap(worst.lead_source)} deals win least (${percent(worst.won_share, 0)}); ${cap(richest?.lead_source).toLowerCase()} holds the most open pipeline (${currency(richest?.open_usd)})`;
-  const flowNote = leakGate
-    ? ` Most lost ${String(worst?.lead_source)} deals drop out at ${leakGate.toLowerCase()}.`
-    : "";
+  const channelI = channelInsight(outcomes.data ?? [], f.period);
+  const winI = winRateInsight(winBySource.data ?? []);
+  const monthI = pipelineByMonthInsight(monthRows, SOURCES, f.period);
+  const repI = repInsight(reps.data ?? []);
+  const stageI = stageDaysInsight(stageDays.data ?? []);
   const flow = buildOutcomeFlow(
     gates.data ?? [],
     SOURCES,
@@ -84,45 +80,52 @@ export function PipelinePage() {
     (s) => SOURCE_COLOR[s] ?? "var(--chart-neutral-bar)",
   );
 
-  const top = funnel.data?.[0];
-  const wonStage = funnel.data?.find((r) => r.stage === "won");
-  const funnelTitle =
-    top && wonStage && toNumber(top.opportunities)
-      ? `${percent(toNumber(wonStage.opportunities)! / toNumber(top.opportunities)!)} of deals created reach won`
-      : "Deals by furthest stage reached";
-
-  const lowestWin = by(known(winBySource.data), "win_rate", "min");
-  const winTitle =
-    lowestWin && known(winBySource.data).length > 1
-      ? `${cap(lowestWin.lead_source)} leads close at ${percent(lowestWin.win_rate)}, the lowest of any source`
-      : "Win rate by lead source";
-  const slipping = by(reps.data, "past_due_share", "max");
-  const repTitle = slipping
-    ? `${slipping.rep_name}: ${percent(slipping.past_due_share, 0)} of open pipeline is past its close date`
-    : "Open pipeline by rep";
-  const slowest = by(stageDays.data, "median_days_in_stage", "max");
-  const stageTitle = slowest
-    ? `Deals wait longest in ${cap(slowest.stage).toLowerCase()}: ${days(slowest.median_days_in_stage)} at the median`
-    : "Median days in stage";
-
-  // Pipeline by month: pivot (month, source) rows into one row per month.
-  const months = new Map<string, Row>();
-  for (const r of byMonth.data ?? []) {
-    const m = String(r.month);
-    const row = months.get(m) ?? { month: m };
-    row[String(r.lead_source)] = toNumber(r.pipeline_created_usd) ?? 0;
-    months.set(m, row);
-  }
-  const monthRows = [...months.values()];
-  const totals = SOURCES.map(
-    (s) =>
-      [s, monthRows.reduce((a, r) => a + (toNumber(r[s]) ?? 0), 0)] as const,
-  );
-  const lead = totals.reduce((a, b) => (b[1] > a[1] ? b : a), totals[0]);
-  const monthTitle =
-    monthRows.length && lead[1] > 0
-      ? `${cap(lead[0])} brings the most new pipeline: ${currency(lead[1])}`
-      : "Pipeline created by month";
+  /** Funnel tooltip for stage index i (rank i + 1). */
+  const funnelDetails = (i: number) => {
+    const stageCount = (k: number) => num(funnel.data?.[k]?.opportunities);
+    const created = stageCount(0);
+    const here = stageCount(i);
+    const at = (outcome: string) =>
+      (gates.data ?? []).filter(
+        (r) => num(r.furthest_stage_rank) === i + 1 && r.outcome === outcome,
+      );
+    const reached = (gates.data ?? []).filter(
+      (r) => num(r.furthest_stage_rank) >= i + 1,
+    );
+    const total = (rows: Row[], k: string) =>
+      rows.reduce((a, r) => a + num(r[k]), 0);
+    return [
+      ...(created
+        ? [{ label: "Share of deals created", value: percent(here / created) }]
+        : []),
+      ...(i > 0 && stageCount(i - 1)
+        ? [
+            {
+              label: `Passed from ${cap(funnel.data?.[i - 1]?.stage).toLowerCase()}`,
+              value: percent(here / stageCount(i - 1)),
+            },
+          ]
+        : []),
+      ...(i < GATES.length
+        ? [
+            {
+              label: "Lost at this stage",
+              value: `${count(total(at("lost"), "deals"))} · ${currency(total(at("lost"), "amount_usd"))}`,
+              color: "var(--chart-negative)",
+            },
+            {
+              label: "Still open here",
+              value: `${count(total(at("open"), "deals"))} · ${currency(total(at("open"), "amount_usd"))}`,
+              color: "var(--chart-neutral-bar)",
+            },
+          ]
+        : []),
+      {
+        label: "Value of these deals",
+        value: currency(total(reached, "amount_usd")),
+      },
+    ];
+  };
 
   return (
     <>
@@ -160,6 +163,7 @@ export function PipelinePage() {
           column="open_pipeline_usd"
           format={(v) => currency(v)}
           note="As of Oct 31, 2026"
+          ignores={skip("open_pipeline")}
         />
         <KpiTile
           slug="lead_conversion"
@@ -173,9 +177,10 @@ export function PipelinePage() {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={funnelTitle}
+          title={funnelI.title}
           subtitle={`Deals created, ${periodLabel.toLowerCase()}, by the furthest stage they reached`}
           query={funnel}
+          isEmpty={!num(funnel.data?.[0]?.opportunities)}
         >
           <Funnel
             rows={funnel.data ?? []}
@@ -183,11 +188,12 @@ export function PipelinePage() {
             value="opportunities"
             stageLabel={cap}
             ariaLabel="Deals by furthest stage reached"
+            details={funnelDetails}
           />
         </ChartCard>
         <ChartCard
-          title={winTitle}
-          subtitle="Won / closed deals by lead source"
+          title={winI.title}
+          subtitle={`Won / closed deals by lead source, closed ${periodLabel.toLowerCase()}`}
           query={winBySource}
         >
           <BarBreakdown
@@ -196,16 +202,23 @@ export function PipelinePage() {
             categoryLabel={cap}
             value="win_rate"
             format={(v) => percent(v)}
-            highlight={(r) => r === lowestWin}
+            highlight={(r) => r.lead_source === winI.highlight?.lead_source}
             ariaLabel="Win rate by lead source"
+            details={(r) => [
+              {
+                label: "Won",
+                value: `${count(r.won_opportunities)} of ${count(r.closed_opportunities)} closed`,
+              },
+              { label: "Value won", value: currency(r.won_usd) },
+            ]}
           />
         </ChartCard>
       </section>
 
       <section className="mt-4">
         <ChartCard
-          title={flowTitle}
-          subtitle={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${flowNote}`}
+          title={channelI.title}
+          subtitle={`Deals created, ${periodLabel.toLowerCase()}, by lead source and where they ended up.${leakNote(gates.data ?? [], channelI.highlight, GATES)}`}
           query={gates}
         >
           <Sankey
@@ -219,7 +232,7 @@ export function PipelinePage() {
               <div
                 key={String(r.lead_source)}
                 className={
-                  r === worst
+                  r.lead_source === channelI.highlight?.lead_source
                     ? "rounded-lg border border-brand-accent/60 bg-foreground/5 px-3 py-2"
                     : "rounded-lg border px-3 py-2"
                 }
@@ -249,8 +262,8 @@ export function PipelinePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={monthTitle}
-          subtitle="Pipeline created per month, by lead source"
+          title={monthI.title}
+          subtitle={`Pipeline created per month, by lead source, ${periodLabel.toLowerCase()}`}
           query={byMonth}
         >
           <BarBreakdown
@@ -265,6 +278,16 @@ export function PipelinePage() {
             format={(v) => currency(v)}
             ariaLabel="Pipeline created by month and lead source"
             aspectRatio="16 / 5"
+            details={(r) =>
+              [...SOURCES]
+                .reverse()
+                .filter((s) => num(r[`${s}__n`]) > 0)
+                .map((s) => ({
+                  color: SOURCE_COLOR[s],
+                  label: `${cap(s)} · ${count(r[`${s}__n`])}`,
+                  value: currency(r[s]),
+                }))
+            }
           />
           <ul
             className="mt-3 flex flex-wrap gap-4 text-xs text-ink-secondary"
@@ -285,24 +308,33 @@ export function PipelinePage() {
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={repTitle}
-          subtitle="Open pipeline as of Oct 31, 2026; highlighted: the largest past-due share"
+          title={repI.title}
+          subtitle={`Open pipeline as of Oct 31, 2026${repI.highlight ? "; highlighted: the largest past-due share" : ""}`}
           query={reps}
+          ignores={skip("open_pipeline_by_rep")}
         >
           <BarBreakdown
             rows={reps.data ?? []}
             category="rep_name"
             value="open_pipeline_usd"
             format={(v) => currency(v)}
-            highlight={(r) => r === slipping}
+            highlight={(r) => r.owner_id === repI.highlight?.owner_id}
             horizontal
             aspectRatio="4 / 3"
             ariaLabel="Open pipeline by rep"
+            details={(r) => [
+              { label: "Open deals", value: count(r.deals) },
+              {
+                label: "Past close date",
+                value: `${count(r.past_due_deals)} · ${currency(r.past_due_pipeline_usd)}`,
+              },
+              { label: "Past-due share", value: percent(r.past_due_share) },
+            ]}
           />
         </ChartCard>
         <ChartCard
-          title={stageTitle}
-          subtitle="Median days in each stage, for stage entries in the period"
+          title={stageI.title}
+          subtitle={`Median days in each stage, for stages entered ${periodLabel.toLowerCase()}`}
           query={stageDays}
         >
           <BarBreakdown
@@ -310,9 +342,15 @@ export function PipelinePage() {
             category="stage"
             categoryLabel={cap}
             value="median_days_in_stage"
-            format={(v) => days(v)}
-            highlight={(r) => r === slowest}
+            format={(v) => days(Math.round(num(v) * 10) / 10)}
+            highlight={(r) => r.stage === stageI.highlight?.stage}
             ariaLabel="Median days in stage"
+            details={(r) => [
+              {
+                label: "Stage entries measured",
+                value: count(r.stage_entries),
+              },
+            ]}
           />
         </ChartCard>
       </section>

@@ -1,3 +1,4 @@
+import type { CardSlug } from "@/api/cards.generated";
 import { useCard, type Row } from "@/api/useCard";
 import { BarBreakdown } from "@/charts/BarBreakdown";
 import { ChartCard } from "@/charts/ChartCard";
@@ -5,8 +6,22 @@ import { CohortHeatmap } from "@/charts/CohortHeatmap";
 import { KpiTile } from "@/charts/KpiTile";
 import { Waterfall } from "@/charts/Waterfall";
 import { FilterBar } from "@/components/FilterBar";
-import { bps, currency, days, month, percent, toNumber } from "@/lib/format";
-import { cardParams, PERIODS, useFilters } from "@/state/filters";
+import { cap, num } from "@/insights/common";
+import {
+  activationInsight,
+  bridgeInsight,
+  cohortInsight,
+  firstYearInsight,
+  trendInsight,
+} from "@/insights/revenue";
+import { calendarWindow } from "@/lib/cohort";
+import { bps, count, currency, days, month, percent } from "@/lib/format";
+import {
+  cardParams,
+  ignoredFilters,
+  PERIODS,
+  useFilters,
+} from "@/state/filters";
 
 const COMPONENTS = [
   { key: "platform_fee", label: "Platform fee", color: "var(--chart-1)" },
@@ -23,29 +38,41 @@ const BRIDGE_LABEL: Record<string, string> = {
   churn: "Churn",
   end: "End",
 };
-const cap = (v: unknown) => {
-  const s = String(v ?? "");
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
-const num = (v: unknown) => toNumber(v) ?? 0;
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  return s.length
-    ? s.length % 2
-      ? s[(s.length - 1) / 2]
-      : (s[s.length / 2 - 1] + s[s.length / 2]) / 2
-    : 0;
-};
+const monthTotal = (r: Row) =>
+  COMPONENTS.reduce((a, c) => a + num(r[c.key]), 0);
+
+function cohortDetails(r: Row) {
+  const m = num(r.months_since_live);
+  const quarter = String(r.cohort_quarter);
+  return {
+    title: `${quarter} · month ${m}`,
+    total: `${percent(r.logo_retention, 0)} kept`,
+    note: `${calendarWindow(quarter, m)}${m === 0 ? " (go-live month, partial)" : ""}`,
+    rows: [
+      { label: "Accounts that went live", value: count(r.cohort_accounts) },
+      { label: `Still active in month ${m}`, value: count(r.active_accounts) },
+      { label: `Revenue in month ${m}`, value: currency(r.net_revenue_usd) },
+      {
+        label: m === 0 ? "Revenue to date" : `Revenue, months 0–${m}`,
+        value: currency(r.revenue_to_date_usd),
+      },
+      ...(m > 1 && r.nrr !== null
+        ? [{ label: "Net revenue retention vs month 1", value: percent(r.nrr) }]
+        : []),
+    ],
+  };
+}
 
 export function RevenuePage() {
   const [f] = useFilters();
-  const p = (slug: Parameters<typeof cardParams>[0]) => cardParams(slug, f);
+  const p = (slug: CardSlug) => cardParams(slug, f);
+  const skip = (...slugs: CardSlug[]) => ignoredFilters(slugs, f);
   const periodLabel = PERIODS[f.period].label;
   const bridgePeriod = f.period === "all" ? "Last 12 months" : periodLabel;
 
   const byMonth = useCard("revenue_by_month", p("revenue_by_month"));
   const bridge = useCard("revenue_bridge_period", p("revenue_bridge_period"));
-  const cohorts = useCard("cohort_retention_grid", {});
+  const cohorts = useCard("cohort_retention_grid", p("cohort_retention_grid"));
   const churn = useCard(
     "churn_by_activation_speed",
     p("churn_by_activation_speed"),
@@ -56,7 +83,7 @@ export function RevenuePage() {
     p("revenue_first_12m_by_source"),
   );
 
-  // Net revenue by month: pivot (month, component) into one row per month.
+  // Net revenue by month: pivot (month, component), remembering the month before.
   const months = new Map<string, Row>();
   for (const r of byMonth.data ?? []) {
     const m = String(r.month);
@@ -64,77 +91,16 @@ export function RevenuePage() {
     row[String(r.component)] = num(r.amount_usd);
     months.set(m, row);
   }
-  const monthRows = [...months.values()];
-  const monthTotal = (r: Row | undefined) =>
-    r ? COMPONENTS.reduce((a, c) => a + num(r[c.key]), 0) : 0;
-  const first = monthTotal(monthRows[0]);
-  const last = monthTotal(monthRows[monthRows.length - 1]);
-  const trendTitle =
-    monthRows.length > 1 && first > 0
-      ? `Net revenue ${last >= first ? "up" : "down"} ${percent(Math.abs(last / first - 1), 0)} to ${currency(last)} a month`
-      : "Net revenue by month";
+  const monthRows: Row[] = [...months.values()];
+  monthRows.forEach(
+    (r, i) => (r.__prev = i > 0 ? monthTotal(monthRows[i - 1]) : null),
+  );
 
-  // Bridge: the biggest gain and the biggest loss.
-  const moves = (bridge.data ?? []).filter(
-    (r) => r.step !== "start" && r.step !== "end",
-  );
-  const gain = moves.reduce<Row | undefined>(
-    (b, r) => (num(r.amount_usd) > num(b?.amount_usd) ? r : b),
-    undefined,
-  );
-  const loss = moves.reduce<Row | undefined>(
-    (b, r) => (num(r.amount_usd) < num(b?.amount_usd ?? 0) ? r : b),
-    undefined,
-  );
-  const bridgeTitle =
-    gain && loss
-      ? `${BRIDGE_LABEL[String(gain.step)]} added ${currency(gain.amount_usd)}; ${BRIDGE_LABEL[String(loss.step)].toLowerCase()} took back ${currency(-num(loss.amount_usd))}`
-      : "Revenue bridge";
-
-  // Cohorts: the quarter with the weakest logo retention at month 12, against the others.
-  const m12 = (cohorts.data ?? []).filter(
-    (r) => num(r.months_since_live) === 12,
-  );
-  const weakest = m12.reduce<Row | undefined>(
-    (b, r) => (!b || num(r.logo_retention) < num(b.logo_retention) ? r : b),
-    undefined,
-  );
-  const others = median(
-    m12.filter((r) => r !== weakest).map((r) => num(r.logo_retention)),
-  );
-  const cohortTitle = weakest
-    ? `Accounts live in ${String(weakest.cohort_quarter)} keep ${percent(weakest.logo_retention, 0)} of logos at month 12, vs ${percent(others, 0)} for other quarters`
-    : "Logo retention by go-live quarter";
-
-  // Activation: slow starters vs fast starters.
-  const slow = churn.data?.find((r) => r.activation_speed === "slow");
-  const fast = churn.data?.find((r) => r.activation_speed === "fast");
-  const churnTitle =
-    slow && fast && num(fast.churn_rate) > 0
-      ? `Slow starters churn at ${percent(slow.churn_rate, 0)}, ${(num(slow.churn_rate) / num(fast.churn_rate)).toFixed(1)}× fast starters`
-      : "Churn by activation speed";
-
-  // First-year revenue: the best real source against the median of the others.
-  const known = (firstYear.data ?? []).filter(
-    (r) => r.lead_source !== "unknown",
-  );
-  const best = known.reduce<Row | undefined>(
-    (b, r) =>
-      num(r.median_net_revenue_first_12m_usd) >
-      num(b?.median_net_revenue_first_12m_usd)
-        ? r
-        : b,
-    undefined,
-  );
-  const rest = median(
-    known
-      .filter((r) => r !== best)
-      .map((r) => num(r.median_net_revenue_first_12m_usd)),
-  );
-  const yearTitle =
-    best && rest > 0
-      ? `${cap(best.lead_source)} accounts earn ${currency(best.median_net_revenue_first_12m_usd)} in their first year, ${(num(best.median_net_revenue_first_12m_usd) / rest).toFixed(1)}× other sources`
-      : "First-year net revenue per account by lead source";
+  const trendI = trendInsight(monthRows, COMPONENTS);
+  const bridgeI = bridgeInsight(bridge.data ?? [], BRIDGE_LABEL);
+  const cohortI = cohortInsight(cohorts.data ?? []);
+  const churnI = activationInsight(churn.data ?? []);
+  const yearI = firstYearInsight(firstYear.data ?? []);
 
   return (
     <>
@@ -163,7 +129,7 @@ export function RevenuePage() {
           label="Take rate"
           column="take_rate"
           format={(v) => bps(v)}
-          note="Net revenue / payment volume"
+          note={`Net revenue / payment volume, ${periodLabel.toLowerCase()}`}
         />
         <KpiTile
           slug="platform_mrr"
@@ -171,7 +137,7 @@ export function RevenuePage() {
           label="Platform MRR"
           column="platform_mrr_usd"
           format={(v) => currency(v)}
-          note="Month of the period's end"
+          note={`Month of ${month(p("platform_mrr").date_to ?? "2026-10-31")}`}
         />
         <KpiTile
           slug="nrr"
@@ -179,7 +145,7 @@ export function RevenuePage() {
           label="Net revenue retention"
           column="nrr"
           format={(v) => percent(v)}
-          note="Same month, a year earlier"
+          note={`${month(p("nrr").date_to ?? "2026-10-31")} vs a year earlier`}
         />
         <KpiTile
           slug="grr"
@@ -193,7 +159,7 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={trendTitle}
+          title={trendI.title}
           subtitle={`Net revenue per month, by component, ${periodLabel.toLowerCase()}`}
           query={byMonth}
         >
@@ -209,6 +175,31 @@ export function RevenuePage() {
             format={(v) => currency(v)}
             ariaLabel="Net revenue by month and component"
             aspectRatio="16 / 5"
+            details={(r) => {
+              const t = monthTotal(r);
+              const prev =
+                r.__prev === null || r.__prev === undefined
+                  ? null
+                  : num(r.__prev);
+              return [
+                ...[...COMPONENTS]
+                  .reverse()
+                  .filter((c) => num(r[c.key]) !== 0)
+                  .map((c) => ({
+                    color: c.color,
+                    label: c.label,
+                    value: `${currency(r[c.key])} · ${percent(num(r[c.key]) / t, 0)}`,
+                  })),
+                ...(prev
+                  ? [
+                      {
+                        label: "vs month before",
+                        value: `${t >= prev ? "+" : ""}${percent(t / prev - 1)}`,
+                      },
+                    ]
+                  : []),
+              ];
+            }}
           />
           <ul
             className="mt-3 flex flex-wrap gap-4 text-xs text-ink-secondary"
@@ -229,7 +220,7 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={bridgeTitle}
+          title={bridgeI.title}
           subtitle={`How monthly net revenue moved, ${bridgePeriod.toLowerCase()}: the month before the period, the moves during it, and its last month${f.period === "all" ? " (the bridge needs a date range: showing the last 12 months)" : ""}`}
           query={bridge}
         >
@@ -247,9 +238,10 @@ export function RevenuePage() {
 
       <section className="mt-4">
         <ChartCard
-          title={cohortTitle}
-          subtitle="Share of each go-live quarter's accounts still active, by months since go-live (fixed cohorts: the period filter doesn't apply)"
+          title={cohortI.title}
+          subtitle="Share of each go-live quarter's accounts still active, by months since go-live. Hover a cell for accounts and revenue."
           query={cohorts}
+          ignores={skip("cohort_retention_grid")}
         >
           <CohortHeatmap
             rows={cohorts.data ?? []}
@@ -257,18 +249,24 @@ export function RevenuePage() {
             period="months_since_live"
             value="logo_retention"
             format={(v) => percent(v, 0)}
-            highlight={weakest ? String(weakest.cohort_quarter) : undefined}
+            highlight={
+              cohortI.highlight
+                ? String(cohortI.highlight.cohort_quarter)
+                : undefined
+            }
             periodLabel={(m) => `M${m}`}
             caption="Logo retention by go-live quarter and months since go-live"
+            details={cohortDetails}
           />
         </ChartCard>
       </section>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title={churnTitle}
-          subtitle={`Accounts live in the data window; slow = more than 45 days from won to first payment. Median activation: ${activation.data ? days(activation.data[0]?.activation_days) : "…"} for deals won ${periodLabel.toLowerCase()}`}
+          title={churnI.title}
+          subtitle={`Accounts live in the data window; slow = more than 45 days from won to first payment. Median activation: ${activation.data?.[0]?.activation_days != null ? days(activation.data[0].activation_days) : "–"} for deals won ${periodLabel.toLowerCase()}`}
           query={churn}
+          ignores={skip("churn_by_activation_speed")}
         >
           <BarBreakdown
             rows={churn.data ?? []}
@@ -280,14 +278,21 @@ export function RevenuePage() {
             }
             value="churn_rate"
             format={(v) => percent(v)}
-            highlight={(r) => r.activation_speed === "slow"}
+            highlight={(r) =>
+              r.activation_speed === churnI.highlight?.activation_speed
+            }
             ariaLabel="Churn rate by activation speed"
+            details={(r) => [
+              { label: "Accounts", value: count(r.accounts) },
+              { label: "Churned", value: count(r.churned_accounts) },
+            ]}
           />
         </ChartCard>
         <ChartCard
-          title={yearTitle}
+          title={yearI.title}
           subtitle="Median net revenue per account in its first 12 months from go-live (accounts with a full first year)"
           query={firstYear}
+          ignores={skip("revenue_first_12m_by_source")}
         >
           <BarBreakdown
             rows={firstYear.data ?? []}
@@ -295,8 +300,14 @@ export function RevenuePage() {
             categoryLabel={cap}
             value="median_net_revenue_first_12m_usd"
             format={(v) => currency(v)}
-            highlight={(r) => r === best}
+            highlight={(r) => r.lead_source === yearI.highlight?.lead_source}
             ariaLabel="First-year net revenue per account by lead source"
+            details={(r) => [
+              {
+                label: "Accounts with a full first year",
+                value: count(r.accounts),
+              },
+            ]}
           />
         </ChartCard>
       </section>

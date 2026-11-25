@@ -4,10 +4,11 @@ import {
   SankeyNode,
   SankeyTooltip,
 } from "@/components/ui/charts";
-import { count } from "@/lib/format";
+import { count, currency, percent } from "@/lib/format";
 import type { FlowLink, FlowNode } from "./flows";
+import { TooltipBody } from "./TooltipBody";
 
-/** Draws a Sankey from prepared nodes and links (colours included); see gateFlow.ts. */
+/** Draws a Sankey from prepared nodes and links (colours included); see flows.ts. */
 export function Sankey({
   nodes,
   links,
@@ -19,6 +20,11 @@ export function Sankey({
   ariaLabel: string;
   aspectRatio?: string;
 }) {
+  const all = links.reduce((a, l) => a + l.value, 0);
+  const of = (side: "source" | "target", i: number) =>
+    links.filter((l) => l[side] === i);
+  const sum = (ls: FlowLink[], k: "value" | "amount") =>
+    ls.reduce((a, l) => a + l[k], 0);
   return (
     <SankeyChart
       ariaLabel={ariaLabel}
@@ -40,7 +46,53 @@ export function Sankey({
         getNodeColor={(_, i) => nodes[i]?.color ?? "var(--chart-neutral-bar)"}
         formatValue={(v) => count(v)}
       />
-      <SankeyTooltip />
+      <SankeyTooltip
+        linkContent={({ link }) => {
+          const l = links.find(
+            (x) => x.source === link.source && x.target === link.target,
+          );
+          if (!l) return null;
+          const fromSource = sum(of("source", l.source), "value");
+          return (
+            <TooltipBody
+              title={`${nodes[l.source].name} → ${nodes[l.target].name}`}
+              total={`${count(l.value)} deals`}
+              rows={[
+                {
+                  label: `Share of ${nodes[l.source].name.toLowerCase()} deals`,
+                  value: percent(l.value / fromSource),
+                },
+                { label: "Share of all deals", value: percent(l.value / all) },
+                { label: "Deal value", value: currency(l.amount) },
+              ]}
+            />
+          );
+        }}
+        nodeContent={({ index }) => {
+          const isSource = of("source", index).length > 0;
+          const mine = of(isSource ? "source" : "target", index);
+          const deals = sum(mine, "value");
+          return (
+            <TooltipBody
+              title={nodes[index].name}
+              total={`${count(deals)} deals`}
+              rows={[
+                { label: "Share of all deals", value: percent(deals / all) },
+                { label: "Deal value", value: currency(sum(mine, "amount")) },
+                // The breakdown on the other side: where a source went, or where an outcome came from.
+                ...mine.map((l) => {
+                  const other = nodes[isSource ? l.target : l.source];
+                  return {
+                    color: other.color,
+                    label: other.name,
+                    value: `${count(l.value)} (${percent(l.value / deals, 0)})`,
+                  };
+                }),
+              ]}
+            />
+          );
+        }}
+      />
     </SankeyChart>
   );
 }

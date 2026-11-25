@@ -7,6 +7,8 @@
 select
     o.owner_id,
     r.name as rep_name,
+    count(*) as deals,
+    sum(case when o.is_past_due then 1 else 0 end) as past_due_deals,
     coalesce(sum(o.amount_usd), 0) as open_pipeline_usd,
     coalesce(sum(o.amount_usd) filter (where o.is_past_due), 0) as past_due_pipeline_usd,
     coalesce(sum(o.amount_usd) filter (where o.is_past_due), 0) / nullif(sum(o.amount_usd), 0) as past_due_share

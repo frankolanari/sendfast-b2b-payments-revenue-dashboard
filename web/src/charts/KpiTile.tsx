@@ -10,6 +10,7 @@ export function KpiTile({
   column,
   format,
   note,
+  ignores,
 }: {
   slug: CardSlug;
   params: CardParams;
@@ -17,6 +18,7 @@ export function KpiTile({
   column: string;
   format: (v: unknown) => string;
   note?: string;
+  ignores?: string[];
 }) {
   const q = useCard(slug, params);
   return (
@@ -36,6 +38,11 @@ export function KpiTile({
         )}
       </div>
       {note && <div className="mt-1 text-xs text-muted-foreground">{note}</div>}
+      {ignores && ignores.length > 0 && (
+        <div className="mt-1 text-xs text-brand-accent">
+          Not affected by {ignores.join(", ")}
+        </div>
+      )}
     </div>
   );
 }
