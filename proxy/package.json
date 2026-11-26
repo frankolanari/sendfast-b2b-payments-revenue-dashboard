@@ -4,16 +4,19 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/node.ts",
+    "dev:direct": "tsx watch src/direct-node.ts",
     "start": "tsx src/node.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "2.1.8",
-    "hono": "4.13.19"
+    "hono": "4.13.19",
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "5.1.0"

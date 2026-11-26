@@ -12,7 +12,7 @@ COMPOSE := docker compose
 export
 WAIT_TIMEOUT ?= 300
 
-.PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
+.PHONY: dev-direct help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
         dev db-roles dbt-docs gate-4 gate-5 gate-6 gate-7 web-check e2e lighthouse metabase-reset metabase-rerun golden-3way card-registry card-registry-check \
@@ -141,6 +141,11 @@ dev: env ## Live preview: proxy on :8787 + web on :5173, hot reload (needs make 
 	pnpm --parallel --filter @sendfast/proxy --filter @sendfast/web run dev
 
 web: dev ## Alias for make dev
+dev-direct: env ## Same dashboard without Metabase: server on :8788 + web on :5174 (needs the data database)
+	@echo "Open http://localhost:5174  (no Metabase; Ctrl-C stops both)"
+	PROXY_PORT=8788 pnpm --filter @sendfast/proxy run dev:direct & \
+	  PROXY_PORT=8788 WEB_PORT=5174 pnpm --filter @sendfast/web run dev & \
+	  trap 'kill 0' INT TERM EXIT; wait
 snapshot: env ## Export the static snapshot from Metabase and build the static demo (web/dist-snapshot)
 	uv run python scripts/metabase_export_snapshot.py
 	pnpm --filter @sendfast/web run build:snapshot

@@ -381,6 +381,14 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: wait for animations before visual captures; stamp or check the data scale behind any evidence. Specific: the chart kit's wipe-in animations.
 **Tags:** #skill
 
+## 2026-11-26 · Side branch · The same dashboard without Metabase
+**Type:** decision
+**What happened:** The owner asked whether dbt and Metabase are necessary, then asked for a second version of the dashboard without Metabase on its own port, and approved the design ("go"). Built on branch `local-direct-postgres`: a small server with the same API runs `metabase/cards/*.sql` in Postgres as `bi_reader`; the web app is unchanged (`make dev-direct`, :5174). `scripts/compare_direct.py`: 50 cards, 229 comparisons, 0 differences. Median of 5 unfiltered runs on six queries: 0.20-0.28 s through Metabase, 0.004-0.031 s direct, on the same Mac.
+**Options considered / pushback:** Copy the project (rejected: drift). Use the static snapshot (rejected: still exported through Metabase, one filter at a time). Metabase stays the official path (D1); dropping it is a separate, later decision. Not merged, not part of any gate.
+**Why it matters:** Because every query lived in the repo as SQL, removing the BI layer from the read path was a small change that could be proven identical.
+**Generic vs specific (#skill):** generic: keep card SQL in files with a thin parameter syntax, so the query runner can be swapped and diffed. Specific: Metabase template tags, type names and 2,000-row limit.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
