@@ -1,4 +1,4 @@
-# Collections the bootstrap creates (by name, top level). Cards and dashboards name one of these.
+# The page areas a card belongs to. Every card names one.
 collections:
   - name: Pipeline
     description: Pipeline and funnel questions (dashboard page 1).
@@ -8,8 +8,6 @@ collections:
     description: Account health and risk (dashboard page 3).
   - name: Accounts
     description: Account 360, the drill target (dashboard page 4).
-  - name: Models
-    description: Metabase models on the key marts, for ad-hoc exploration by analysts.
   - name: Filter values
     description: Small cards that feed dashboard filter dropdowns.
   - name: Golden numbers

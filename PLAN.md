@@ -5,6 +5,19 @@ Supersedes v1 (`metabase-portfolio-plan.md`). Drop this file into the repo root 
 
 ---
 
+## Amendment, 2026-11-27: Metabase removed; Stage 7B added
+
+Owner decisions (see `JOURNAL.md` and `docs/gates/log.md`). Where a later section still mentions
+Metabase, this amendment wins; those passages are kept as the record of Stages 6 and 7 as built
+(tag `gate-6`).
+
+- The read path is: React → dashboard server (`proxy/`) → Postgres marts, as `bi_reader`.
+  Queries live in `queries/cards`; `make card-registry` generates the allow-list and server SQL.
+- No Metabase, no app database, no native dashboards. `make up` starts only the data Postgres.
+- Gates 6 and 7 are as in Section 4A.
+- **Stage 7B** follows gate 7: sales targets set in the dashboard, deal change history and the
+  five-page layout. Scope and gate: `docs/proposals/2026-11-27-dashboard-v2.md`.
+
 ## 0. How to use this document
 
 - Work stage by stage, in order. Each stage has a **goal**, **deliverables**, **acceptance criteria** and **CI additions**.
@@ -19,21 +32,21 @@ Supersedes v1 (`metabase-portfolio-plan.md`). Drop this file into the repo root 
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | **Primary front-end route: custom React app on the Metabase REST API**, through a small local proxy. The SDK is not the main route | The SDK is Pro/Enterprise only. API-key auth is for local evaluation only. Theming in code and drill-through in embeds are paid. The REST route runs on free open source, so the production swap is real and the design is fully ours |
-| D2 | Metabase **open-source edition**, self-hosted in Docker, **image tag pinned** | Reproducibility. SDK and API behaviour change between versions |
-| D3 | Metabase app DB is its **own Postgres**, not H2 | Durability, and it can be dumped and restored |
+| D1 | **Custom React app on our own small server**, which runs the committed SQL cards in Postgres as `bi_reader` (amended 2026-11-27) | Metabase added 0.2-0.3 s to each query and wasn't needed in the read path |
+| D2 | **Container image tags are pinned** (amended 2026-11-27) | Reproducibility |
+| D3 | _Retired 2026-11-27 (Metabase removed)_ | |
 | D4 | **Stripe data is already in Postgres** (an upstream pipeline, out of scope). Billing tables keep Stripe's shape (minor units, Unix timestamps) | Every competent data team has this pipeline. Don't build it here |
 | D5 | **The CRM is the messy, swappable source.** Each CRM gets a readable YAML map file. A compiler turns the map into staging models | The hub principle: the dashboard plugs into one canonical shape, and each CRM gets an adapter |
 | D6 | **dbt Core** (dbt-postgres) for staging → intermediate → marts, plus tests | Tests, lineage, docs, and an industry-standard keyword |
-| D7 | **All metric logic lives in SQL marts.** The YAML metric dictionary is the spec plus expected values. Metabase metrics/measures are only for simple additive metrics | Metabase metrics are query-builder-only and limited to one table. NRR, cohorts and velocity need SQL |
-| D8 | **Metabase content as code:** React-facing questions are native SQL files in the repo, created idempotently through the API | Serialization and remote sync are paid. Native SQL cards move cleanly between instances |
+| D7 | **All metric logic lives in SQL marts.** The YAML metric dictionary is the spec plus expected values | One definition per metric |
+| D8 | **Queries as code:** every dashboard query is a SQL file in `queries/cards`, generated into the server bundle (amended 2026-11-27) | Reviewable, tested, and the browser can only ask for committed queries |
 | D9 | Charts: **shadcn.io charts (primary, on TanStack Charts); EvilCharts' Apache ECharts components (secondary/fallback).** Owner decision, 2026-11-24; reasons in Stage 7. UI: **Radix primitives + Tailwind**, driven by our own tokens. Data fetching: **TanStack Query** | Chosen against the chart-library criteria in Stage 7 |
-| D10 | Four pages: **Pipeline & funnel**, **Revenue & retention** (incl. activation), **Account health & risk**, **Account 360** (drill target). The rep deep dive becomes a filter on page 1 | The full loop is better shown by one account's timeline than by a fourth summary page |
+| D10 | Five pages: **Overview**, **Pipeline**, **Team**, **Revenue & retention**, **Account health**; **Account 360** is the drill target. Each metric has one home (amended 2026-11-27, built in Stage 7B) | `docs/proposals/2026-11-27-dashboard-v2.md` |
 | D11 | **Fixed as-of date** for all data: `2026-10-31`, with 24 months of history. Never use `now()` | Deterministic data, tests and screenshots |
 | D12 | **The AI boundary is enforced, not just a rule.** Production credentials never live in the repo, in CI, or anywhere the coding agent can read | This is what makes the privacy claim credible |
-| D13 | GitHub Actions for CI/CD. The static snapshot is deployed to Cloudflare Pages | Automated proof at every stage. A clickable demo with no hosted Metabase |
-| D14 | **Build locally now, deploy to cloud later (Stage 10).** Target: data DB on **Supabase Cloud**, Metabase self-hosted on a **VPS via Coolify**, React on **Cloudflare Pages**, proxy as a **Cloudflare Worker**. Everything built locally must follow the cloud-ready rules in Section 2A | Local is faster to build. The cloud move should be configuration, not a rewrite |
-| D15 | **UTC everywhere.** Every timestamp in every source, model, database session, Metabase setting and chart is UTC. Postgres and Metabase are pinned to UTC; a source that lands local times is converted to UTC in staging, and nothing downstream uses another zone | Owner decision, 2026-11-24. One zone removes a whole class of day-boundary and DST bugs, and makes every number reproducible |
+| D13 | GitHub Actions for CI/CD. The static snapshot is deployed to Cloudflare Pages | Automated proof at every stage. A clickable demo with no database |
+| D14 | **Build locally now, deploy to cloud later (Stage 10).** Target: data DB on **Supabase Cloud**, React on **Cloudflare Pages**, the dashboard server as a **Cloudflare Worker** (amended 2026-11-27) | Same code locally and in cloud |
+| D15 | **UTC everywhere.** Every timestamp in every source, model, database session, database setting and chart is UTC. Postgres is pinned to UTC; a source that lands local times is converted to UTC in staging, and nothing downstream uses another zone | Owner decision, 2026-11-24. One zone removes a whole class of day-boundary and DST bugs, and makes every number reproducible |
 
 ---
 
@@ -73,7 +86,7 @@ Database roles (D12):
 | Role | Reads | Writes | Used by |
 |---|---|---|---|
 | `transformer` | raw schemas, staging, intermediate, marts | staging, intermediate, marts only | dbt |
-| `bi_reader` | marts only | none | Metabase |
+| `bi_reader` | marts only | none | the dashboard server |
 | `conformance` | raw schemas + all analytics schemas | none | conformance CLI |
 
 ---
@@ -601,8 +614,8 @@ Each gate is one Makefile target: `make gate-N`. It runs that stage's checks plu
 | G3 | Generator | invariant tests; determinism hash matches; each planted story detectable in raw data; full run under 5 minutes | owner looks at 5 quick profile charts (deal sizes, volume curve, churn timing, failures by corridor, revenue trend) and confirms it looks real |
 | G4 | Transformations | `dbt build` with zero test failures; identity match rate ≥ 95% | none |
 | G5 | Golden numbers | every metric in `metrics.yml` matches the answer key within tolerance | none |
-| G6 | Metabase | bootstrap from an empty app DB in under 3 minutes; bootstrap rerun changes nothing; three-way golden check passes | owner confirms cross-filtering on native dashboards (screenshot saved to `docs/evidence/`) |
-| G7 | Front end | typecheck, lint, Vitest, build; Playwright on all 4 pages with zero console errors; Lighthouse accessibility ≥ 90 | owner confirms design quality and that every planted story is visible |
+| G6 | Query layer | `bi_reader` reads the marts only and cannot write; three-way golden check (answer key, marts, dashboard server); every query answers within 2 s | none |
+| G7 | Front end | typecheck, lint, Vitest, build; golden answers on the Cloudflare Workers runtime; Playwright on all 4 pages with zero console errors; Lighthouse accessibility ≥ 90 | owner confirms design quality and that every planted story is visible |
 | G8 | Swap rehearsal | full CI matrix green for `hubspot` and `salesforce`; conformance report passes with aggregate-only output; `what_broke.md` has entries; no diffs outside `mappings/` and the generator except those logged | owner reads `what_broke.md` |
 | G9 | Release | fresh-clone `make demo` succeeds on a clean CI runner; deploy succeeded; Definition of Done (Section 11) all ticked | owner watches the video and reads the README |
 | G11 | Skill | `skill/` complete; dry run on a logistics domain reaches its Gate 3 from `SKILL.md` alone; gaps logged and fixed | owner reads `SKILL.md` and the dry-run notes |
@@ -658,9 +671,9 @@ CI grows with each stage (see each stage's "CI additions"). Final state:
 | `unit` | lint | pytest (generator invariants, mapping compiler, conformance output rule), Vitest (web) |
 | `compiled-up-to-date` | unit | fresh compile of maps equals committed staging SQL |
 | `integration` (matrix: hubspot, salesforce) | unit | Postgres service → generate scale 0.1 → compile maps → `dbt build` → golden (answer key vs marts) → conformance (synthetic profile) |
-| `metabase` (matrix: hubspot, salesforce) | integration | pinned Metabase + app DB → bootstrap → three-way golden check → export snapshot (artifact) |
+| `dashboard` (matrix: hubspot, salesforce) | integration | reader permissions → three-way golden check → query time → Workers runtime → export snapshot (artifact) |
 | `web` | unit | typecheck, build |
-| `e2e` | metabase, web | Playwright on snapshot mode; screenshots as artifacts |
+| `e2e` | dashboard, web | Playwright on snapshot mode; screenshots as artifacts |
 
 Notes
 - Cache `uv`, `pnpm` and the Metabase image to keep runs fast.
@@ -773,7 +786,7 @@ Cut from the top. Never cut golden numbers or planted stories.
 1b. At a gate with a human sign-off, prepare the evidence and stop until the owner approves.
 2. Never read, create, or reference production credentials, `.env.prod`, or the `prod` compose profile. Never connect to any database except the local synthetic one.
 3. Never hand-edit generated files (`dbt/models/staging/crm/*`, `contract/data_dictionary.md`). Change the source (map, contract) and regenerate.
-4. Every metric is computed in a mart. No business logic in React, the proxy, or Metabase GUI questions beyond simple additive metrics.
+4. Every metric is computed in a mart. No business logic in React or the dashboard server.
 5. Every new card uses the shared parameter contract (Stage 6).
 6. Any change to the schema contract needs a version bump and a changelog entry.
 7. Keep the data deterministic: fixed seed, fixed as-of date, never `now()`.

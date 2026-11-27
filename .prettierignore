@@ -22,6 +22,8 @@ web/src/components/charts/
 # Generated card registry (scripts/export_card_registry.py)
 web/src/api/cards.generated.ts
 
-# Generated snapshot (scripts/metabase_export_snapshot.py)
+# Generated snapshot (scripts/export_snapshot.py)
 web/public/snapshot/
 web/dist-snapshot/
+# Generated server SQL (scripts/export_card_registry.py)
+proxy/src/sql.generated.ts

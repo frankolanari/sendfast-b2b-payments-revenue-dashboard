@@ -125,7 +125,7 @@ jobs:
             dbt/target/manifest.json
             dbt/target/catalog.json
 
-  metabase:
+  dashboard:
     needs: integration
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -134,26 +134,28 @@ jobs:
       - uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
-      - run: uv sync --locked
-      - run: cp .env.example .env
-      - name: start the stack (data Postgres, Metabase app DB, pinned Metabase; up to 5 min)
-        run: make up
-      - name: generate synthetic data (scale 0.1)
-        run: make generate SCALE=0.1
-      - name: compile maps, apply roles, dbt build (all tests)
-        run: make transform CRM=hubspot
-      - name: bootstrap Metabase from an empty app DB (under 3 minutes)
-        run: make metabase-bootstrap
-      - name: a second bootstrap changes nothing
-        run: make metabase-rerun
-      - name: three-way golden check (answer key vs marts vs Metabase, scale 0.1 key)
-        run: make golden-3way SCALE=0.1
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - run: uv sync --locked
       - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - name: start the data database
+        run: make up
+      - name: generate synthetic data (scale 0.1)
+        run: make generate SCALE=0.1
+      - name: compile maps, apply roles, dbt build (all tests)
+        run: make transform CRM=hubspot
+      - name: the dashboard role reads the marts and nothing else
+        run: make reader-check
+      - name: three-way golden check (answer key vs marts vs dashboard server, scale 0.1 key)
+        run: make golden-3way SCALE=0.1
+      - name: every dashboard query answers within 2 seconds
+        run: make query-time
+      - name: the server on the Cloudflare Workers runtime gives the same answers
+        run: make worker-check SCALE=0.1
       - name: export the static snapshot (every card, every preset)
         run: make snapshot
       - uses: actions/upload-artifact@v7
@@ -184,7 +186,7 @@ jobs:
         run: make web-check
 
   e2e:
-    needs: [metabase, web]
+    needs: [dashboard, web]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

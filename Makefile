@@ -8,16 +8,20 @@ COMPOSE := docker compose
 
 # Local settings (.env) reach every recipe: the DB loader reads them. Synthetic values only.
 -include .env
--include .env.metabase # the proxy's API key, written by metabase-bootstrap
 export
 WAIT_TIMEOUT ?= 300
+# The live preview's ports (override in .env).
+WEB_PORT ?= 5174
+PROXY_PORT ?= 8788
+# Run a command with the dashboard server up on a free port.
+SERVED := uv run python scripts/dashboard_checks.py serve
 
 .PHONY: help env up down lint secrets test contract-check contract-dictionary gate-1 \
         compiled-check compile-idempotent dbt-parse gate-2 \
         answer-keys answer-keys-check stories profile-charts generate-timed gate-3 \
-        dev db-roles dbt-docs gate-4 gate-5 gate-6 gate-7 web-check e2e lighthouse metabase-reset metabase-rerun golden-3way card-registry card-registry-check \
-        generate compile-maps transform metabase-bootstrap golden conformance web snapshot demo \
-        gate-0 gates
+        dev db-roles dbt-docs gate-4 gate-5 gate-6 gate-7 web-check e2e lighthouse reader-check golden-3way \
+        query-time worker-check card-registry card-registry-check \
+        generate compile-maps transform golden conformance web snapshot demo gate-0 gates
 
 help: ## List targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*## "} {printf "  %-20s %s\n", $$1, $$2}'
@@ -26,7 +30,7 @@ env: ## Fail if .env is missing
 	@test -f .env || { echo "Missing .env. Run: cp .env.example .env"; exit 1; }
 
 # ── Stack ────────────────────────────────────────────────────────────────
-up: env ## Start Postgres (data + Metabase app DB) and Metabase; wait until healthy
+up: env ## Start the data Postgres; wait until healthy
 	$(COMPOSE) up -d --wait --wait-timeout $(WAIT_TIMEOUT)
 
 down: ## Stop the stack (keeps volumes)
@@ -108,41 +112,33 @@ compile-maps: ## CRM YAML map -> dbt staging models (CRM=hubspot by default)
 	uv run python scripts/compile_mappings.py compile --crm $(CRM)
 transform: env compile-maps db-roles ## dbt build: staging -> intermediate -> marts, all tests (CRM=hubspot)
 	$(DBT) build $(DBT_DIRS)
-# ── Metabase layer (Stage 6) ─────────────────────────────────────────────
-# The app DB holds only what the bootstrap rebuilds from the repo, so it is safe to wipe.
-MB_APP_PSQL ?= $(COMPOSE) exec -T postgres-metabase psql -q -v ON_ERROR_STOP=1 -U $(MB_APP_DB_USER) -d postgres
-
-metabase-reset: env ## Empty Metabase app DB, restart Metabase, wait until healthy (local stack only)
-	$(COMPOSE) stop metabase
-	$(MB_APP_PSQL) -c 'drop database if exists "$(MB_APP_DB_NAME)" with (force)' -c 'create database "$(MB_APP_DB_NAME)"'
-	$(COMPOSE) up -d --wait --wait-timeout $(WAIT_TIMEOUT) metabase
-	rm -f .env.metabase
-
-metabase-bootstrap: env ## Rebuild Metabase from the repo: setup, DB, collections, cards, models, measures, dashboards
-	uv run python scripts/metabase_bootstrap.py --max-seconds 180
-
-card-registry: ## Regenerate web/src/api/cards.generated.ts from metabase/ (proxy allow-list, web types)
+# ── Query layer (Stage 6) ────────────────────────────────────────────────
+card-registry: ## Regenerate the card registry and server SQL from queries/
 	uv run python scripts/export_card_registry.py
 
-card-registry-check: ## Fail if the committed card registry differs from a fresh generation
+card-registry-check: ## Fail if a committed generated file differs from a fresh generation
 	uv run python scripts/export_card_registry.py --check
 
-metabase-rerun: env ## Bootstrap again: must change nothing (idempotent)
-	uv run python scripts/metabase_bootstrap.py --max-seconds 180 --expect-no-changes
+reader-check: env ## bi_reader reads the marts and nothing else, and cannot write
+	uv run python scripts/dashboard_checks.py permissions
+
 golden: env ## Golden numbers: answer key vs marts, as bi_reader (SCALE must match the loaded data)
 	uv run python scripts/golden_check.py --scale $(SCALE)
-golden-3way: env ## Three-way golden check: answer key vs marts vs Metabase cards (Stage 6)
-	uv run python scripts/golden_check.py --scale $(SCALE) --metabase
+golden-3way: env ## Three-way golden check: answer key vs marts vs the dashboard server (Stage 6)
+	$(SERVED) -- uv run python scripts/golden_check.py --scale $(SCALE) --dashboard
+query-time: env ## Every dashboard query answers within 2 seconds
+	$(SERVED) -- uv run python scripts/dashboard_checks.py timing
+worker-check: env ## The server on Cloudflare's local runtime gives the same golden answers
+	$(SERVED) --worker -- uv run python scripts/golden_check.py --scale $(SCALE) --dashboard
 conformance: ## Aggregate-only conformance checks (Stage 8)
 	@echo "Not built yet: Stage 8." && exit 1
-dev: env ## Live preview: proxy on :8787 + web on :5173, hot reload (needs make metabase-bootstrap)
-	@test -n "$$MB_API_KEY" || { echo "No MB_API_KEY: run make metabase-bootstrap"; exit 1; }
-	@echo "Open http://localhost:$${WEB_PORT:-5173}  (Ctrl-C stops both)"
+dev: env ## Live preview: server on :$(PROXY_PORT) + web on :$(WEB_PORT), hot reload (needs the data database)
+	@echo "Open http://localhost:$(WEB_PORT)  (Ctrl-C stops both)"
 	pnpm --parallel --filter @sendfast/proxy --filter @sendfast/web run dev
 
 web: dev ## Alias for make dev
-snapshot: env ## Export the static snapshot from Metabase and build the static demo (web/dist-snapshot)
-	uv run python scripts/metabase_export_snapshot.py
+snapshot: env ## Export the static snapshot and build the static demo (web/dist-snapshot)
+	$(SERVED) -- uv run python scripts/export_snapshot.py
 	pnpm --filter @sendfast/web run build:snapshot
 
 web-check: card-registry-check ## Web and proxy: typecheck, unit tests, production build
@@ -155,7 +151,7 @@ e2e: ## Playwright on all four pages in snapshot mode (needs make snapshot first
 
 lighthouse: ## Lighthouse accessibility >= 90 on each page (needs make snapshot first)
 	pnpm --filter @sendfast/web run lighthouse
-demo: up generate compile-maps transform metabase-bootstrap golden snapshot ## Everything end to end
+demo: up generate compile-maps transform golden-3way snapshot ## Everything end to end
 
 # ── Gates (PLAN.md Section 4A); cumulative ───────────────────────────────
 gate-0: up lint secrets ## G0: containers healthy, pre-commit passes, gitleaks clean
@@ -176,10 +172,10 @@ gate-4: gate-3 transform ## G4: dbt build with zero test failures, identity matc
 gate-5: gate-4 golden ## G5: every metric in metrics.yml matches the answer key (+ G0-4)
 	@echo "Gate 5 passed."
 
-gate-6: gate-5 metabase-reset metabase-bootstrap metabase-rerun golden-3way ## G6: bootstrap from empty < 3 min, rerun changes nothing, three-way golden (+ G0-5)
-	@echo "Gate 6 passed (automated part). Owner sign-off: cross-filtering screenshots in docs/evidence/gate-6/."
+gate-6: gate-5 reader-check golden-3way query-time ## G6: reader permissions, three-way golden, every query <= 2 s (+ G0-5)
+	@echo "Gate 6 passed."
 
-gate-7: gate-6 web-check snapshot e2e lighthouse ## G7: typecheck, lint, tests, build, e2e with no console errors, Lighthouse >= 90 (+ G0-6)
+gate-7: gate-6 web-check worker-check snapshot e2e lighthouse ## G7: typecheck, tests, build, Workers runtime, e2e with no console errors, Lighthouse >= 90 (+ G0-6)
 	@echo "Gate 7 passed (automated part). Owner sign-off: design quality and planted stories, docs/evidence/gate-7/."
 
 gates: gate-7 ## Run every gate built so far

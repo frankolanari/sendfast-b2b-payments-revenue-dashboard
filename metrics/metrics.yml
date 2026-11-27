@@ -10,8 +10,8 @@
 # rounds to 6 decimal places, so ratios get 1e-6 and money gets a cent; days and counts
 # must match exactly.
 # golden.card names the dashboard card that shows the metric; Stage 6's three-way check runs it
-# through Metabase with the listed filters (values are names from `periods`) and compares its
-# `column` with the key. Every metric also gets a generated golden card ("Golden: <name>").
+# through the dashboard server with the listed filters (values are names from `periods`) and compares its
+# `column` with the key. Every golden query is also held to the card rules (scripts/card_content.py).
 # Query parameters (psycopg2 %(name)s) come from `periods` below and are checked against the
 # answer key's meta, so a new key with other dates can't silently pass against old ones.
 
@@ -49,7 +49,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.01
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Pipeline created (USD)
         column: pipeline_created_usd
         parameters: { date_from: golden_month_start, date_to: golden_month_end }
@@ -100,7 +100,7 @@ metrics:
       window: trailing_12_months
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Win rate
         column: win_rate
         parameters: { date_from: t12_start, date_to: t12_end }
@@ -129,7 +129,7 @@ metrics:
       window: trailing_12_months
       expected: from_answer_key
       tolerance: 0
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Sales cycle (median days)
         column: sales_cycle_days
         parameters: { date_from: t12_start, date_to: t12_end }
@@ -204,7 +204,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.01
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Total payment volume (USD)
         column: total_payment_volume_usd
         parameters: { date_from: golden_month_start, date_to: golden_month_end }
@@ -234,7 +234,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.01
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Net revenue (USD)
         column: net_revenue_usd
         parameters: { date_from: golden_month_start, date_to: golden_month_end }
@@ -263,7 +263,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Take rate
         column: take_rate
         parameters: { date_from: golden_month_start, date_to: golden_month_end }
@@ -295,7 +295,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.01
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Platform MRR (USD)
         column: platform_mrr_usd
         parameters: { date_to: golden_month_end }
@@ -323,7 +323,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Net revenue retention (NRR)
         column: nrr
         parameters: { date_to: golden_month_end }
@@ -362,7 +362,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Gross revenue retention (GRR)
         column: grr
         parameters: { date_to: golden_month_end }
@@ -462,7 +462,7 @@ metrics:
       window: calendar_2025
       expected: from_answer_key
       tolerance: 0
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Activation (median days)
         column: activation_days
         parameters: { date_from: year_2025_start, date_to: year_2025_end }
@@ -493,7 +493,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Failure rate
         column: failure_rate
         parameters: { date_from: golden_month_start, date_to: golden_month_end }
@@ -542,7 +542,7 @@ metrics:
       window: trailing_12_months
       expected: from_answer_key
       tolerance: 0.000001
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Top-10 revenue concentration
         column: top10_share
         parameters: { date_from: t12_start, date_to: t12_end }
@@ -578,7 +578,7 @@ metrics:
       window: golden_month
       expected: from_answer_key
       tolerance: 0.01
-      card: # the dashboard card that shows this metric, run through Metabase (Stage 6)
+      card: # the dashboard card that shows this metric, asked of the dashboard server (Stage 6)
         name: Revenue at risk (USD)
         column: revenue_at_risk_usd
         parameters: { date_to: golden_month_end }

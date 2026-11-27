@@ -41,3 +41,17 @@ _Withdrawn 2026-11-24: the owner set UTC everywhere (PLAN.md D15), the HubSpot m
   22.0 -> 22.5 days over 118 accounts; inbound, partner and unknown medians); scale 0.1 values are
   unchanged. The marts and the SQL were not changed to fit. Approved by the owner on 2026-11-24
   (rule 1a).
+
+## 2026-11-27 · Owner approval: Metabase removed, checks replaced (rule 1a)
+
+The owner approved, from a table shown in the session:
+
+- Three-way golden check: the third source becomes the dashboard server (same dashboard metrics).
+- Proxy view-only key check -> `bi_reader` cannot write or read outside the marts.
+- Query rules and their tests kept; proxy and parameter tests rewritten for the new server; the
+  static demo export reads the new server; browser and accessibility checks unchanged.
+- New: every dashboard query answers within 2 seconds.
+- Removed as no longer applicable: Metabase rebuild time and rerun-changes-nothing checks;
+  dashboard, layout, cross-filter, drill-link and measure tests. The G6 owner sign-off on
+  Metabase cross-filtering is covered by the Stage 7 design sign-off.
+- Before gate 7 passes, the server must run on Cloudflare Workers as well as Node.

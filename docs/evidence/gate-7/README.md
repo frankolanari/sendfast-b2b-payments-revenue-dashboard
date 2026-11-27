@@ -22,5 +22,5 @@ visible.
 | Corridor failure spike                | Account health & risk: "Failure rate by corridor" (USD-NGN, Mar 2026) |
 | Revenue concentration                 | Account health & risk: "Revenue concentration"                        |
 
-Run it yourself: `make up && make dev` (live, http://localhost:5173), or `make snapshot` then
+Run it yourself: `make up && make dev` (live, http://localhost:5174), or `make snapshot` then
 `pnpm --filter @sendfast/web run preview --outDir dist-snapshot` (static demo).

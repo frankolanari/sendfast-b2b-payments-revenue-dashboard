@@ -1,9 +1,8 @@
 # The shared parameter contract (PLAN.md Stage 6). Every card takes a subset of these, with the
-# same names and types; every dashboard filter is one of these. scripts/metabase_bootstrap.py
-# refuses a card or dashboard that uses anything else. Stage 7's proxy passes the same names.
+# same names and types; every page filter is one of these. scripts/card_content.py refuses a
+# card that uses anything else. The dashboard server passes the same names.
 #
-# type: date -> native `date` tag, dashboard `date/single`; text -> native `text` tag,
-# dashboard `string/=`. Defaults are fixed dates (D11: never now()): the trailing 12 months.
+# type: date or text. Defaults are fixed dates (D11: never now()): the trailing 12 months.
 # values: a static list (segment and lead source come from the schema contract's allowed
 # values, plus `unknown`), or a card in the "Filter values" collection.
 

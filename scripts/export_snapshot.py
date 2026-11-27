@@ -1,25 +1,24 @@
 """Static snapshot for the hosted demo (PLAN.md Stage 7): every card for every preset.
 
-    uv run python scripts/metabase_export_snapshot.py            # -> web/public/snapshot/*.json
+    uv run python scripts/export_snapshot.py                     # -> web/public/snapshot/*.json
 
 Presets are what the front end offers in snapshot mode: each fixed period, combined with at
 most one page filter value, and (for Account 360) the accounts a visitor can reach from the
-default view. Cards run through Metabase with the proxy's view-only key, so the demo shows
-exactly what live mode would. Synthetic data only. Output is gitignored and rebuilt on deploy.
+default view. Cards are asked of the dashboard server, so the demo shows exactly what live
+mode would. Synthetic data only. Output is gitignored and rebuilt on deploy.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-import metabase_content as mc
-from metabase_bootstrap import Client, env, read_key_file
+import card_content as mc
+from golden_check import dashboard_url, query_card
 
 OUT = mc.ROOT / "web" / "public" / "snapshot"
 # Mirrors web/src/state/filters.ts PERIODS (checked by a test).
@@ -58,21 +57,6 @@ def presets(accepted: list[str], values: dict[str, list[str]]) -> list[dict[str,
     return list(seen.values())
 
 
-def metabase_parameters(params: dict[str, str], contract: dict) -> list[dict[str, Any]]:
-    out = []
-    for name, value in params.items():
-        is_date = contract[name]["type"] == "date"
-        out.append(
-            {
-                "id": name,
-                "type": "date/single" if is_date else "string/=",
-                "target": ["variable", ["template-tag", name]],
-                "value": value if is_date else [value],
-            }
-        )
-    return out
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=OUT)
@@ -81,21 +65,14 @@ def main(argv: list[str] | None = None) -> int:
 
     contract = mc.load_parameters()
     cards = {Path(c.source).stem: c for c in mc.load_cards()}
-    api_key = read_key_file() or os.environ.get("MB_API_KEY")
-    if not api_key:
-        print("No MB_API_KEY: run make metabase-bootstrap")
-        return 1
-    mb = Client(env("MB_SITE_URL"), api_key=api_key)
-    ids = {c["name"]: c["id"] for c in mb.get("/api/card?f=all") if not c.get("archived")}
+    base = dashboard_url()
 
     def run(job: tuple[str, dict[str, str]]) -> tuple[str, dict[str, str], dict[str, Any]]:
         slug, params = job
-        body = {"parameters": metabase_parameters(params, contract)}
-        res = mb.post(f"/api/card/{ids[cards[slug].name]}/query", body)
-        if res.get("status") != "completed":
-            raise RuntimeError(f"{slug} {params}: {str(res.get('error'))[:200]}")
-        cols = [{"name": c["name"], "type": c["base_type"]} for c in res["data"]["cols"]]
-        return slug, params, {"card": slug, "columns": cols, "rows": res["data"]["rows"]}
+        try:
+            return slug, params, query_card(base, slug, params)
+        except RuntimeError as err:
+            raise RuntimeError(f"{slug} {params}: {err}") from err
 
     def run_all(jobs):
         with ThreadPoolExecutor(max_workers=args.workers) as pool:

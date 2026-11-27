@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-import metabase_content as mc
-import metabase_export_snapshot as snap
+import card_content as mc
+import export_snapshot as snap
 
 
 def test_periods_match_the_front_end():

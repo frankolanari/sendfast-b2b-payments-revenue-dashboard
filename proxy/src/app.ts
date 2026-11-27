@@ -1,6 +1,6 @@
 /**
- * The Metabase proxy (PLAN.md Stage 7, D1). The browser calls this; only this holds the
- * Metabase API key. It runs saved cards only, from an allow-list generated from metabase/cards,
+ * The dashboard's API (PLAN.md Stage 7, D1). The browser calls this; only this talks to the
+ * database. It runs the committed queries only, from an allow-list generated from queries/cards,
  * with parameters checked against the shared parameter contract. Web-standard APIs only, so the
  * same app runs on Node (local) and Cloudflare Workers (Stage 10): cloud-ready rule 6.
  */
@@ -11,15 +11,6 @@ import {
   type CardSlug,
   type ParamName,
 } from "../../web/src/api/cards.generated";
-
-export interface ProxyConfig {
-  /** Metabase base URL, e.g. http://localhost:3000 (from env, never hard-coded). */
-  metabaseUrl: string;
-  /** The view-only API key the bootstrap created (from env; never sent to the browser). */
-  apiKey: string;
-  /** Injected for tests; defaults to the global fetch. */
-  fetch?: typeof fetch;
-}
 
 export interface CardResult {
   card: CardSlug;
@@ -65,49 +56,16 @@ export function checkParameters(
   return errors;
 }
 
-/** Metabase's parameter list for a card query: every value targets a native template tag. */
-export function metabaseParameters(given: Record<string, string>) {
-  return Object.entries(given).map(([name, value]) => {
-    const isDate = parameterContract[name as ParamName].type === "date";
-    return {
-      id: name,
-      type: isDate ? "date/single" : "string/=",
-      target: ["variable", ["template-tag", name]],
-      value: isDate ? value : [value],
-    };
-  });
-}
+/** A card query that could not be answered; the message is safe to show in the browser. */
+export class CardError extends Error {}
 
-export function createApp(config: ProxyConfig) {
-  const doFetch = config.fetch ?? fetch;
-  const base = config.metabaseUrl.replace(/\/$/, "");
-  const headers = {
-    "Content-Type": "application/json",
-    "x-api-key": config.apiKey,
-  };
-  let ids: Promise<Map<string, number>> | null = null; // card name -> Metabase id, cached
+export type RunCard = (
+  slug: CardSlug,
+  parameters: Record<string, string>,
+) => Promise<CardResult>;
 
-  async function cardIds(): Promise<Map<string, number>> {
-    if (!ids) {
-      ids = (async () => {
-        const res = await doFetch(`${base}/api/card?f=all`, { headers });
-        if (!res.ok) throw new Error(`card list ${res.status}`);
-        const list = (await res.json()) as {
-          id: number;
-          name: string;
-          archived?: boolean;
-        }[];
-        return new Map(
-          list.filter((c) => !c.archived).map((c) => [c.name, c.id]),
-        );
-      })().catch((err) => {
-        ids = null; // retry next time
-        throw err;
-      });
-    }
-    return ids;
-  }
-
+/** The API the browser sees, whatever answers the queries. Parameters are checked here. */
+export function createCardApp(run: RunCard) {
   const app = new Hono();
 
   app.get("/api/health", (c) => c.json({ status: "ok" }));
@@ -118,7 +76,6 @@ export function createApp(config: ProxyConfig) {
     const slug = c.req.param("slug");
     if (!Object.hasOwn(cards, slug))
       return c.json({ error: `unknown card ${slug}` }, 404);
-    const card = cards[slug as CardSlug];
 
     let body: { parameters?: Record<string, unknown> } = {};
     if (c.req.header("content-length") !== "0") {
@@ -136,42 +93,14 @@ export function createApp(config: ProxyConfig) {
     if (errors.length)
       return c.json({ error: "invalid parameters", details: errors }, 400);
 
-    let id: number | undefined;
     try {
-      id = (await cardIds()).get(card.name);
-    } catch {
-      return c.json({ error: "Metabase is unavailable" }, 502);
-    }
-    if (id === undefined)
       return c.json(
-        { error: `card ${slug} is not in Metabase (bootstrap?)` },
-        502,
+        await run(slug as CardSlug, given as Record<string, string>),
       );
-
-    const res = await doFetch(`${base}/api/card/${id}/query`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        parameters: metabaseParameters(given as Record<string, string>),
-      }),
-    });
-    if (!res.ok)
-      return c.json({ error: `Metabase answered ${res.status}` }, 502);
-    const out = (await res.json()) as {
-      status?: string;
-      data?: { cols: { name: string; base_type: string }[]; rows: unknown[][] };
-    };
-    if (out.status !== "completed" || !out.data)
-      return c.json({ error: "the card failed in Metabase" }, 502);
-    const result: CardResult = {
-      card: slug as CardSlug,
-      columns: out.data.cols.map((col) => ({
-        name: col.name,
-        type: col.base_type,
-      })),
-      rows: out.data.rows,
-    };
-    return c.json(result);
+    } catch (err) {
+      if (err instanceof CardError) return c.json({ error: err.message }, 502);
+      throw err;
+    }
   });
 
   return app;

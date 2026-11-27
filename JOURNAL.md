@@ -381,6 +381,14 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: wait for animations before visual captures; stamp or check the data scale behind any evidence. Specific: the chart kit's wipe-in animations.
 **Tags:** #skill
 
+## 2026-11-26 · Side branch · The same dashboard without Metabase
+**Type:** decision
+**What happened:** The owner asked whether dbt and Metabase are necessary, then asked for a second version of the dashboard without Metabase on its own port, and approved the design ("go"). Built on branch `local-direct-postgres`: a small server with the same API runs `metabase/cards/*.sql` in Postgres as `bi_reader`; the web app is unchanged (`make dev-direct`, :5174). `scripts/compare_direct.py`: 50 cards, 229 comparisons, 0 differences. Median of 5 unfiltered runs on six queries: 0.20-0.28 s through Metabase, 0.004-0.031 s direct, on the same Mac.
+**Options considered / pushback:** Copy the project (rejected: drift). Use the static snapshot (rejected: still exported through Metabase, one filter at a time). Metabase stays the official path (D1); dropping it is a separate, later decision. Not merged, not part of any gate.
+**Why it matters:** Because every query lived in the repo as SQL, removing the BI layer from the read path was a small change that could be proven identical.
+**Generic vs specific (#skill):** generic: keep card SQL in files with a thin parameter syntax, so the query runner can be swapped and diffed. Specific: Metabase template tags, type names and 2,000-row limit.
+**Tags:** #skill
+
 ## 2026-11-27 · Beyond Stage 7 · Owner ideas: D3, Cube, and turning this into a product (parked)
 **Type:** decision
 **What happened:** After comparing a local version without Metabase (branch `local-direct-postgres`, noticeably faster) with the official one, and talking to peers, the owner said Metabase shouldn't stay just for its own sake, and raised three things:
@@ -392,6 +400,29 @@ The owner asked for this to be noted for building that business, and not to spra
 **Agent's notes (not owner decisions):** The chart kit in use already builds on D3 modules (`d3-scale`, `d3-shape`, `d3-sankey`). Today Metabase does little semantic-layer work here: metric logic lives in dbt marts, card SQL and `metrics/metrics.yml`, and no Metabase pre-aggregation is used. Cube would sit between the marts and the app; it doesn't replace dbt. The product idea has early pieces here (schema contract, compiled CRM map, seeded generator, aggregate-only conformance in Stage 8, deploy from env). Open questions: what can be profiled from real data without leaking it; how close synthetic data must be before surprises only show in production (rule 9); how much per-business mapping can be automated.
 **Why it matters:** Stages 8 (swap rehearsal) and 11 (reusable skill) are the first real test of the product idea.
 **Generic vs specific (#skill):** generic: contract, mapping, synthetic mirror, conformance, deploy. Specific: payments metrics and the HubSpot map.
+**Tags:** #skill
+
+## 2026-11-27 · Beyond Stage 7 · Drop Metabase; targets, deal history and a new layout
+**Type:** decision
+**What happened:** The owner shared screenshots of nine pages of a sales dashboard demo. The audit found repeated metrics across its pages, and in ours two different win percentages per lead source on one page, repeated risk figures, and no overview, target or forecast. The owner approved: sales targets set in the dashboard; deal change history now; five pages (Overview, Pipeline, Team, Revenue & retention, Account health); a Stage 7B with the contract change and new answer-key entries (`docs/proposals/2026-11-27-dashboard-v2.md`). The owner decided to drop Metabase because it is slower and the dashboard should be snappy; the direct Postgres version is the way forward. The Metabase containers and the :5173 preview were stopped.
+**Options considered / pushback:** Keep Metabase, or use both. The cost of dropping it: no self-serve exploration, four dashboards lost, and the proxy, snapshot export, three-way number check, gates and CI need rework. No check has been changed yet. Whether to finish gate 7 first is still open.
+**Why it matters:** The read path is now chosen on measured speed (0.004-0.031 s against 0.20-0.28 s).
+**Generic vs specific (#skill):** generic: audit a reference dashboard for questions answered and repeats, then check each idea against the data before promising it. Specific: payments sales metrics.
+**Tags:** #skill
+
+## 2026-11-27 · Stage 6/7 · Metabase removed from the project
+**Type:** decision
+**What happened:** With the owner's approval of a check-by-check table (docs/gates/log.md), Metabase was taken out. `metabase/` became `queries/`; the bootstrap, native dashboards, models and measures were deleted; the direct Postgres server became the only server and now runs on Node and the Cloudflare Workers runtime. Replaced checks: reader permissions (from the database catalog, plus one real refused write; proven to fail for an over-privileged user), three-way golden against the dashboard server (19/19), every query within 2 s (87 queries, slowest 0.07 s), golden answers on workerd. The full static snapshot export went from about 10 minutes to 23 s including the build.
+**Options considered / pushback:** The first version of the direct server read SQL from disk, which cannot run on Workers; the SQL is now generated into the server bundle, never the browser. While porting tests, the agent first dropped three golden-check tests that lived in the Metabase test file; noticed and restored before running them.
+**Why it matters:** One service and one database fewer, and the checks that matter (numbers, permissions, parameters) survived.
+**Generic vs specific (#skill):** generic: when removing a layer, list every check it carried and say what replaces each before deleting; test that a new permission check can fail. Specific: Metabase v0.64.
+**Tags:** #skill
+
+## 2026-11-27 · Stage 7 · Gate 7 passes locally, without Metabase
+**Type:** gate-pass
+**What happened:** A full `make gate-7` passed on the first run after the change: gates 0-6, 124 Python, 13 server and 57 web tests, golden 19/19 against the dashboard server on Node and on the Workers runtime, slowest of 87 queries 0.20 s, 8/8 browser tests, accessibility 100 on four pages. The four evidence screenshots came out identical to those taken through Metabase. The owner's design sign-off is still to come; CI has not yet run this commit.
+**Why it matters:** Identical images from a different read path are independent proof that the dashboard shows the same thing.
+**Generic vs specific (#skill):** generic: screenshot equality is a cheap check when swapping a layer. Specific: none.
 **Tags:** #skill
 
 ---
@@ -435,4 +466,4 @@ _(Your own words, any time. Rough is fine.)_
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
 | 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
 | 6 Metabase | 2026-11-24 | 2026-11-24 | 2 | stale API key within one make run; activation clipped by the window |
-| 7 Front end | 2026-11-24 | pending (CI green) | 3 so far | e2e picked up by unit runner; two slow-laptop timeouts |
+| 7 Front end | 2026-11-24 | pending sign-off | 3, then passed | e2e picked up by unit runner; two slow-laptop timeouts; Metabase removed |

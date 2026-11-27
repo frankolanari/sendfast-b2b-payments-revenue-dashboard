@@ -45,7 +45,7 @@ from pg_namespace
 where nspname in ('crm_hubspot', 'crm_salesforce', 'billing', 'ledger', 'rates')
 \gexec
 
--- 5. bi_reader (Metabase): the marts only
+-- 5. bi_reader (the dashboard server): the marts only
 grant usage on schema analytics to bi_reader;
 grant select on all tables in schema analytics to bi_reader;
 alter default privileges for role transformer in schema analytics grant select on tables to bi_reader;

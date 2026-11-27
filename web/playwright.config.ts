@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// End-to-end against snapshot mode (PLAN.md Stage 7): no Metabase needed at test time.
+// End-to-end against snapshot mode (PLAN.md Stage 7): no database needed at test time.
 const port = Number(process.env.E2E_PORT ?? 4174);
 
 export default defineConfig({

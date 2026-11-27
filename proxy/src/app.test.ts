@@ -1,50 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkParameters, createApp, metabaseParameters } from "./app";
+import { cards, parameterContract } from "../../web/src/api/cards.generated";
+import { checkParameters } from "./app";
+import { createApp, renderQuery, type AppConfig } from "./query";
+import { cardSql } from "./sql.generated";
 
-const KEY = "test-key-not-real";
+const SECRET = "synthetic-password-not-real";
 
-function fakeMetabase(overrides: Partial<Record<string, () => Response>> = {}) {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const fetchMock = vi.fn(
-    async (url: string | URL | Request, init?: RequestInit) => {
-      const u = String(url);
-      calls.push({ url: u, init });
-      if (u.endsWith("/api/card?f=all")) {
-        return (
-          overrides.list?.() ??
-          Response.json([
-            { id: 11, name: "Win rate" },
-            { id: 12, name: "Pipeline created (USD)" },
-            { id: 99, name: "Win rate", archived: true },
-          ])
-        );
-      }
-      if (
-        u.includes("/api/card/11/query") ||
-        u.includes("/api/card/12/query")
-      ) {
-        return (
-          overrides.query?.() ??
-          Response.json({
-            status: "completed",
-            data: {
-              cols: [
-                { name: "win_rate", base_type: "type/Decimal", extra: "x" },
-              ],
-              rows: [[0.33]],
-            },
-          })
-        );
-      }
-      return new Response("not found", { status: 404 });
-    },
-  );
-  const app = createApp({
-    metabaseUrl: "http://mb.test/",
-    apiKey: KEY,
-    fetch: fetchMock as typeof fetch,
+function fakeDatabase(fail = false, rows: unknown[][] = [[0.33]]) {
+  const query = vi.fn<AppConfig["query"]>(async () => {
+    if (fail) throw new Error(`auth failed for ${SECRET}: select secret_sql`);
+    return { fields: [{ name: "win_rate", dataTypeID: 1700 }], rows };
   });
-  return { app, calls };
+  return { app: createApp({ query }), query };
 }
 
 const post = (
@@ -83,30 +50,52 @@ describe("checkParameters", () => {
   });
 });
 
-describe("metabaseParameters", () => {
-  it("targets native template tags; text values are lists", () => {
-    expect(
-      metabaseParameters({ date_to: "2026-09-30", segment: "smb" }),
-    ).toEqual([
-      {
-        id: "date_to",
-        type: "date/single",
-        target: ["variable", ["template-tag", "date_to"]],
-        value: "2026-09-30",
-      },
-      {
-        id: "segment",
-        type: "string/=",
-        target: ["variable", ["template-tag", "segment"]],
-        value: ["smb"],
-      },
+describe("renderQuery", () => {
+  const SQL = `-- name: Demo {{ignored}} [[ ignored ]]
+select * from t
+where d <= {{date_to}}
+  [[ and segment = {{segment}} ]]
+  [[ and (owner_id = {{owner_id}} or segment = {{segment}}) ]]`;
+
+  it("binds values, reuses a placeholder and drops clauses without a value", () => {
+    const q = renderQuery(SQL, { segment: "smb" });
+    expect(q.text).toContain("d <= $1::date");
+    expect(q.text).toContain("and segment = $2::text");
+    expect(q.text).not.toContain("owner_id");
+    expect(q.text).not.toContain("ignored");
+    expect(q.values).toEqual(["2026-10-31", "smb"]);
+  });
+
+  it("never puts a value into the SQL text", () => {
+    const q = renderQuery(SQL, { segment: "x' or '1'='1" });
+    expect(q.text).not.toContain("'1'='1");
+  });
+
+  it("uses the given value over the contract default", () => {
+    expect(renderQuery(SQL, { date_to: "2026-01-31" }).values).toEqual([
+      "2026-01-31",
     ]);
+  });
+
+  it("renders every committed card, with and without all its parameters", () => {
+    for (const [slug, card] of Object.entries(cards)) {
+      const all = Object.fromEntries(
+        card.params.map((p) => [
+          p,
+          parameterContract[p].type === "date" ? "2026-01-31" : "x",
+        ]),
+      );
+      for (const given of [{}, all]) {
+        const q = renderQuery(cardSql[slug]!, given);
+        expect(q.text, slug).not.toMatch(/\{\{|\[\[/);
+      }
+    }
   });
 });
 
 describe("POST /api/cards/:slug", () => {
-  it("runs an allowed card through Metabase with the key, and returns columns and rows only", async () => {
-    const { app, calls } = fakeMetabase();
+  it("runs an allowed card and returns columns and rows only", async () => {
+    const { app, query } = fakeDatabase();
     const res = await post(app, "win_rate", {
       parameters: { date_from: "2025-11-01" },
     });
@@ -116,56 +105,49 @@ describe("POST /api/cards/:slug", () => {
       columns: [{ name: "win_rate", type: "type/Decimal" }],
       rows: [[0.33]],
     });
-    const query = calls.find((c) => c.url.endsWith("/api/card/11/query"))!;
-    expect(new Headers(query.init!.headers).get("x-api-key")).toBe(KEY);
-    expect(JSON.parse(String(query.init!.body)).parameters[0].id).toBe(
-      "date_from",
+    expect(query.mock.calls[0]![1]).toContain("2025-11-01");
+  });
+
+  it("returns at most 2000 rows", async () => {
+    const { app } = fakeDatabase(
+      false,
+      Array.from({ length: 2001 }, () => [1]),
     );
+    const body = (await (await post(app, "win_rate", {})).json()) as {
+      rows: unknown[];
+    };
+    expect(body.rows).toHaveLength(2000);
   });
 
-  it("never returns the API key to the browser", async () => {
-    const { app } = fakeMetabase();
-    const res = await post(app, "win_rate", {});
-    expect(await res.text()).not.toContain(KEY);
-    expect([...res.headers.values()].join(" ")).not.toContain(KEY);
-  });
-
-  it("refuses cards that aren't in the allow-list, without calling Metabase", async () => {
-    const { app, calls } = fakeMetabase();
+  it("refuses cards that aren't in the allow-list, without querying", async () => {
+    const { app, query } = fakeDatabase();
     expect((await post(app, "drop_everything", {})).status).toBe(404);
-    expect(calls).toHaveLength(0);
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("refuses bad parameters with 400, without calling Metabase", async () => {
-    const { app, calls } = fakeMetabase();
+  it("ignores SQL sent by the browser", async () => {
+    const { app, query } = fakeDatabase();
+    await post(app, "win_rate", { sql: "select secret", query: "select 1" });
+    expect(query.mock.calls[0]![0]).not.toContain("secret");
+  });
+
+  it("refuses bad parameters with 400, without querying", async () => {
+    const { app, query } = fakeDatabase();
     const res = await post(app, "win_rate", {
       parameters: { segment: "giant" },
     });
     expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
+    expect(query).not.toHaveBeenCalled();
   });
 
-  it("caches card ids and skips archived duplicates", async () => {
-    const { app, calls } = fakeMetabase();
-    await post(app, "win_rate", {});
-    await post(app, "pipeline_created", {});
-    expect(calls.filter((c) => c.url.endsWith("/api/card?f=all"))).toHaveLength(
-      1,
-    );
-    expect(calls.some((c) => c.url.includes("/api/card/99/"))).toBe(false);
-  });
-
-  it("turns Metabase failures into 502 without leaking details", async () => {
-    const { app } = fakeMetabase({
-      query: () => Response.json({ status: "failed", error: "secret sql" }),
-    });
+  it("turns database failures into 502 without leaking details", async () => {
+    const { app } = fakeDatabase(true);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await post(app, "win_rate", {});
+    const text = await res.text();
     expect(res.status).toBe(502);
-    expect(await res.text()).not.toContain("secret sql");
-  });
-
-  it("502 when the card isn't in Metabase yet", async () => {
-    const { app } = fakeMetabase({ list: () => Response.json([]) });
-    expect((await post(app, "win_rate", {})).status).toBe(502);
+    expect(text).not.toContain(SECRET);
+    expect(text).not.toContain("secret_sql");
+    log.mockRestore();
   });
 });
