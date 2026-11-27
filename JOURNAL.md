@@ -381,6 +381,19 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: wait for animations before visual captures; stamp or check the data scale behind any evidence. Specific: the chart kit's wipe-in animations.
 **Tags:** #skill
 
+## 2026-11-27 · Beyond Stage 7 · Owner ideas: D3, Cube, and turning this into a product (parked)
+**Type:** decision
+**What happened:** After comparing a local version without Metabase (branch `local-direct-postgres`, noticeably faster) with the official one, and talking to peers, the owner said Metabase shouldn't stay just for its own sake, and raised three things:
+1. **D3** for custom visuals with full control.
+2. **Cube** in the role Metabase plays now: semantic layer, pre-aggregations and so on.
+3. **A product:** make this process repeatable across businesses, as a development-kit style SaaS. Connect a business's real sources; mirror their structure into a development sandbox filled with synthetic data; design the dashboard there, so no real data is shared with the AI; on deploy, the same dashboard runs on production data.
+
+The owner asked for this to be noted for building that business, and not to sprawl now. No plan, stage or tool changes.
+**Agent's notes (not owner decisions):** The chart kit in use already builds on D3 modules (`d3-scale`, `d3-shape`, `d3-sankey`). Today Metabase does little semantic-layer work here: metric logic lives in dbt marts, card SQL and `metrics/metrics.yml`, and no Metabase pre-aggregation is used. Cube would sit between the marts and the app; it doesn't replace dbt. The product idea has early pieces here (schema contract, compiled CRM map, seeded generator, aggregate-only conformance in Stage 8, deploy from env). Open questions: what can be profiled from real data without leaking it; how close synthetic data must be before surprises only show in production (rule 9); how much per-business mapping can be automated.
+**Why it matters:** Stages 8 (swap rehearsal) and 11 (reusable skill) are the first real test of the product idea.
+**Generic vs specific (#skill):** generic: contract, mapping, synthetic mirror, conformance, deploy. Specific: payments metrics and the HubSpot map.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
