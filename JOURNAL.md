@@ -389,6 +389,14 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **Generic vs specific (#skill):** generic: keep card SQL in files with a thin parameter syntax, so the query runner can be swapped and diffed. Specific: Metabase template tags, type names and 2,000-row limit.
 **Tags:** #skill
 
+## 2026-11-27 · Beyond Stage 7 · Drop Metabase; targets, deal history and a new layout
+**Type:** decision
+**What happened:** The owner shared screenshots of nine pages of a sales dashboard demo. The audit found repeated metrics across its pages, and in ours two different win percentages per lead source on one page, repeated risk figures, and no overview, target or forecast. The owner approved: sales targets set in the dashboard; deal change history now; five pages (Overview, Pipeline, Team, Revenue & retention, Account health); a Stage 7B with the contract change and new answer-key entries (`docs/proposals/2026-11-27-dashboard-v2.md`). The owner decided to drop Metabase because it is slower and the dashboard should be snappy; the direct Postgres version is the way forward. The Metabase containers and the :5173 preview were stopped.
+**Options considered / pushback:** Keep Metabase, or use both. The cost of dropping it: no self-serve exploration, four dashboards lost, and the proxy, snapshot export, three-way number check, gates and CI need rework. No check has been changed yet. Whether to finish gate 7 first is still open.
+**Why it matters:** The read path is now chosen on measured speed (0.004-0.031 s against 0.20-0.28 s).
+**Generic vs specific (#skill):** generic: audit a reference dashboard for questions answered and repeats, then check each idea against the data before promising it. Specific: payments sales metrics.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
