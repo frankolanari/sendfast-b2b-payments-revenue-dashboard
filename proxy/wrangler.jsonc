@@ -1,0 +1,9 @@
+// The dashboard server on Cloudflare Workers (cloud-ready rule 6). Locally: make worker-check.
+// Settings and secrets come from the environment, never from this file. Deployment is Stage 10.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sendfast-dashboard",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-09",
+  "compatibility_flags": ["nodejs_compat"],
+}

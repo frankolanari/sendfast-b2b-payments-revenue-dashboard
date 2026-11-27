@@ -12,6 +12,10 @@ __pycache__/
 .ruff_cache/
 
 # Node
+web/public/snapshot/
+web/dist-snapshot/
+web/test-results/
+web/playwright-report/
 node_modules/
 dist/
 .pnpm-store/
@@ -26,3 +30,9 @@ dbt/logs/
 .idea/
 .vscode/
 dbt/.user.yml
+
+# Owner's design inspiration (a saved third-party web page): reference only, never committed
+html website sample/
+
+# Cloudflare local runtime state
+.wrangler/

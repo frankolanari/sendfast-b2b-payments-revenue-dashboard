@@ -10,6 +10,7 @@ One line per gate pass (PLAN.md Section 4A). Approved exceptions are listed with
 | G3   | 2026-11-24 | `4afeb25` | none (test change withdrawn, see below)                                  |
 | G4   | 2026-11-24 | `e6b3787` | contract 2.0.0; three version-relative tests (approved, see below)       |
 | G5   | 2026-11-24 | `8526e8f` | answer key: activation and lead-source definitions (approved, see below) |
+| G6   | 2026-11-24 | `c7a081b` | none (owner sign-off: cross-filter screenshots in docs/evidence/gate-6)  |
 
 ## Exceptions
 
@@ -40,3 +41,24 @@ _Withdrawn 2026-11-24: the owner set UTC everywhere (PLAN.md D15), the HubSpot m
   22.0 -> 22.5 days over 118 accounts; inbound, partner and unknown medians); scale 0.1 values are
   unchanged. The marts and the SQL were not changed to fit. Approved by the owner on 2026-11-24
   (rule 1a).
+
+## 2026-11-27 · Owner approval: Metabase removed, checks replaced (rule 1a)
+
+The owner approved, from a table shown in the session:
+
+- Three-way golden check: the third source becomes the dashboard server (same dashboard metrics).
+- Proxy view-only key check -> `bi_reader` cannot write or read outside the marts.
+- Query rules and their tests kept; proxy and parameter tests rewritten for the new server; the
+  static demo export reads the new server; browser and accessibility checks unchanged.
+- New: every dashboard query answers within 2 seconds.
+- Removed as no longer applicable: Metabase rebuild time and rerun-changes-nothing checks;
+  dashboard, layout, cross-filter, drill-link and measure tests. The G6 owner sign-off on
+  Metabase cross-filtering is covered by the Stage 7 design sign-off.
+- Before gate 7 passes, the server must run on Cloudflare Workers as well as Node.
+
+## 2026-11-27 · Gate 7: owner sign-off and merge rules
+
+- The owner approved the design and planted stories (docs/evidence/gate-7/). The note that
+  October's true-up is not yet billed moves to Stage 7B.
+- The owner approved the required checks on `main`: `metabase` replaced by `dashboard`, and `web`
+  and `e2e` added.

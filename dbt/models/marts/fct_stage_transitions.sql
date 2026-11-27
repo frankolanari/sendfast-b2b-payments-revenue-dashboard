@@ -17,6 +17,7 @@ select
     opportunities.account_id,
     opportunities.owner_id,
     opportunities.lead_source,
+    opportunities.segment,
     transitions.stage,
     transitions.stage_sequence,
     transitions.entered_at,

@@ -285,6 +285,152 @@ Rules: add entries, never rewrite old ones. Honest beats polished. Template and 
 **What happened:** Gate 6 needs the owner to confirm cross-filtering on the native dashboards. Evidence is in `docs/evidence/gate-6/` (6 screenshots and a README): clicking a lead source bar filters Pipeline & funnel; clicking the USD-NGN spike filters Account health & risk to that corridor; clicking the top account opens Account 360 for it. Under the owner's standing rule, the agent saved the evidence and carried on; the owner can object afterwards.
 **Tags:** #skill
 
+## 2026-11-24 · Stage 6 · Gate 6 passed in CI and merged
+**Type:** gate-pass
+**What happened:** All 8 CI checks green on PR #8. The new `metabase` job's log shows a fresh bootstrap (79 objects, 10.7 s), a rerun with no changes and the three-way golden check at 19/19 on the 0.1 key. Merged and tagged `gate-6` on `c7a081b` after checking the merge commit carries the cards, dashboards, scripts and evidence. `metabase` is now a required check on `main` (8 in all). The tag push hit the credential flake once; a retry worked. Owner sign-off evidence: `docs/evidence/gate-6/`.
+**Evidence:** PR #8, tag `gate-6` on `c7a081b`.
+**Tags:** #skill
+
+## 2026-11-24 · Stage 7 · Owner decision: the chart library
+**Type:** decision
+**What happened:** The owner named the two candidates held back since planning: shadcn.io charts (primary) and EvilCharts' ECharts components (secondary). The agent checked both against the plan's five criteria from the sites themselves and npm, and recorded the table in PLAN.md (Stage 7, D9). Primary: funnel, waterfall and Sankey are native; the heatmap is calendar-only, so the cohort heatmap is our own small component. Secondary is Apache ECharts underneath, so it doubles as the plan's fallback.
+**Surprise:** shadcn.io's install command carries the account holder's personal token. The agent must never handle a credential, so the owner runs the chart installs once; after that the code is ordinary source in the repo and CI needs nothing.
+**Options considered / pushback:** Plain shadcn/ui charts (Recharts) were not on the owner's list. ECharts alone covers every type but looks stock without heavy theming.
+**Generic vs specific (#skill):** generic: an install step that needs a personal account is a human step; schedule it, write the exact command, and keep the result as source so CI never needs the account. Specific: the two libraries.
+**Tags:** #article #skill
+
+## 2026-11-25 · Stage 7 · The shadcn.io charts are in
+**Type:** milestone
+**What happened:** The owner signed in to shadcn.io and pasted the install commands; the agent ran them (pinned `shadcn@4.23.0`, not `@latest`), adding the Sankey and line charts with the same token so all eight planned types landed in one install: funnel, waterfall, Sankey, line, bar, sparkline, heatmap, ring. The kit is bklit-ui (MIT) ported onto `@tanstack/charts`: 786 source files, 5.7 MB, under `web/src/components/ui/charts/`, plus one sample per chart. New npm packages pinned exactly; all at least 7 days old. Before committing, the repo was grepped for the token: 0 files contain it, and `components.json` holds no registry credentials. All eight samples render under React 19 with zero console errors (`docs/evidence/stage-7/installed-charts-smoke.png`). The vendored kit is excluded from ESLint and prettier: we wrap it, never hand-edit it; reinstalling updates it.
+**Problem → fix:** (1) The first install sent all eight URLs as one argument: zsh doesn't word-split a variable, and the registry answered "Invalid token", which pointed at the wrong cause. A real array fixed it. (2) ESLint was told to ignore the kit, but the pre-commit hook passes files by name, and ESLint's "file ignored" warning tripped `--max-warnings=0`; the hook now excludes the path too.
+**Watch:** the bundle grew from 69 kB to 323 kB gzipped with every sample on one page; pages will load their charts lazily.
+**Tags:** #skill
+
+## 2026-11-25 · Stage 7 · The cohort heatmap lied about recent cohorts (right-censoring)
+**Type:** problem-fix
+**What happened:** The first Revenue page said "Accounts live in 2025Q4 keep 10% of logos at month 12". An account that went live in December 2025 reaches month 12 only in December 2026, after the as-of date, so `fct_cohort_retention` was dividing by the whole cohort while only the oldest accounts could appear in late months. Every late cell of every recent cohort understated retention. No test caught it; the insight title did, because it picked the most extreme cell. Fix in the mart: `is_complete` is true only when the cohort's latest go-live month plus the months-since-live is on or before the as-of month; the heatmap card shows complete cells only. After the fix the title found the planted story itself: 2025Q1 keeps 31% at month 12 (answer key 0.310345) vs 72% for other quarters.
+**Why it matters:** Second time in this build (after activation days at Stage 6) that a data-window edge produced a confident wrong number. Both were found by looking at an insight on screen, not by a test.
+**Generic vs specific (#skill):** generic: any "months since X" metric is right-censored near the as-of date; flag complete cells in the mart and never let a viz render incomplete ones as values. Specific: go-live cohorts.
+**Tags:** #linkedin #article #skill
+
+## 2026-11-25 · Stage 7 · Owner audit: titles must hold under any filter, and charts should explain themselves
+**Type:** pushback
+**What happened:** The owner asked for an audit of titles and richer tooltips. Switching 8 filter combinations on both pages showed titles that were true only at the default view: comparing a single source with itself ("Partner deals win least yet hold the most"), win shares for deals too young to close (Sep 2026), "$0 open pipeline" as "the most", rankings from a handful of deals, "0% past due" as a finding, and a cohort chart that ignored every filter. Fix: title logic moved into pure functions (`web/src/insights/`) with fairness rules (at least 2 groups with 10+ records before ranking; still-open share above 35% reported instead of win shares; no highlight when there is nothing to flag), each audit failure now a test. Filters wired where meaningful (cohort chart by segment/lead source through a new account x month mart; days in stage by segment; lead conversion by segment and rep); charts that truly can't apply a filter say "Not affected by ...". Every chart got a detailed tooltip, including the owner's example: a cohort cell shows accounts that went live, still active, revenue that month and to date, NRR and the calendar window.
+**Evidence:** cohort refactor verified identical (116 rows, 0 differences); 41 web tests.
+**Generic vs specific (#skill):** generic: insight titles need sample-size, censoring and degenerate-group rules, tested like any logic; label ignored filters instead of silently ignoring them. Specific: the pipeline and revenue findings.
+**Tags:** #linkedin #article #skill
+
+## 2026-11-25 · Stage 7 · Leakage and decay: the owner spots what the page was missing
+**Type:** pushback
+**What happened:** The owner pointed out that the Pipeline page showed neither deal decay nor leakage. Re-reading the plan, the agent had also dropped two items it does ask for: a lead -> opportunity -> won funnel and a velocity breakdown. The agent proposed four charts and said what the data cannot show (win rates don't fall with deal age, almost no stalled deals, close-date pushes aren't recorded). The owner declined planting a decay story ("we don't have to plant a story"), then improved the design mid-build: one bigger funnel starting at leads, with leakage under each step, instead of a separate leakage chart. Built that way, plus an ageing chart (open value by deal age, past close date marked) and a velocity table (open deals x average won x win rate / cycle, by segment).
+**Problem -> fix:** following leads through the funnel needs the same people, but the CRM contract has no lead id on the opportunity. A converted lead is matched to the opportunity of the same account created on the conversion date (1,193 of 1,193 match one to one here, tested for uniqueness). That is an assumption to verify against a real CRM at the swap (Stage 8).
+**Numbers:** 1,529 leads -> 96 won in 12 months; negotiation leaks most ($5.7M); $5.3M of open pipeline is over 90 days old; velocity $47,050.45 a day, equal to the golden metric.
+**Quotable line:** "Two charts became one better one: the funnel already knew where it leaked."
+**Generic vs specific (#skill):** generic: check a page against the plan's list before calling it done; put leakage on the funnel itself; say what data can't show instead of charting it. Specific: the lead-to-deal match rule.
+**Tags:** #linkedin #article #case-study #skill
+
+## 2026-11-25 · Stage 7 · Owner decision: name first, finding second, explanation third
+**Type:** decision
+**What happened:** The plan said chart titles should state the insight. In use, the owner found long sentence titles hard to scan: "these have to have recognizable titles that somebody can easily see", like the scorecards. Every chart card now reads: a short name ("Sales funnel", "Cohort retention"), the computed finding under it, then a small note saying what is measured. PLAN.md Stage 7 updated.
+**Why it matters:** A headline that changes with every filter can't be the thing a reader navigates by. Names are stable landmarks; findings move underneath them.
+**Quotable line:** "Titles are for finding the chart. Insights are for reading it."
+**Generic vs specific (#skill):** generic: name / finding / note hierarchy for every chart card. Specific: the names chosen.
+**Tags:** #linkedin #x #skill
+
+## 2026-11-25 · Stage 7 · Owner: make it a dashboard, not a presentation (Group by)
+**Type:** decision
+**What happened:** The owner asked to regroup Sales velocity, then Deal outcomes too: "we can have more of a dashboard than a presentation, because you allow people to interact with it better". Both cards now switch between segment, lead source, rep, team and industry (country left out: 3 of 12 countries have under 10 closed deals). The choice is kept in the URL beside the filters.
+**How:** each card returns every grouping in one result (a `dimension` column), so the shared filter contract didn't change and the switch is instant. Groups under 10 closed deals are dimmed and never ranked; dimensions with more groups than the palette has hues stay neutral, with only the flagged group coloured. "Channel outcomes" is renamed "Deal outcomes".
+**Numbers:** velocity across all groups still equals the golden $47,050.45; every grouping accounts for all 453 deals.
+**Quotable line:** "A presentation answers the question you picked. A dashboard answers the one the reader has."
+**Generic vs specific (#skill):** generic: return all groupings in one card and switch client-side; keep view choices in the URL; never cycle colours past the palette. Specific: the five dimensions.
+**Tags:** #linkedin #x #article #skill
+
+## 2026-11-25 · Stage 7 · Owner: focus the best performer, and let a click change the focus
+**Type:** decision
+**What happened:** Deal outcomes highlighted the weakest group. The owner asked for the best performer by deals won as the default, and for the summary cards to act as a selector: click one, it takes the highlight and everything else fades back. Built: default focus = most deals won (value breaks ties, missing CRM values never rank); a click focuses a group, the finding and the "where lost deals stopped" note follow it, and the choice is in the URL. Changing the grouping or a filter that removes the group falls back to the default.
+**Why it matters:** The default view should say who is doing well; the reader chooses who to inspect.
+**Generic vs specific (#skill):** generic: summary cards double as the chart's selector (buttons with pressed state), with the selection in the URL. Specific: "best" = deals won.
+**Tags:** #article #skill
+
+## 2026-11-25 · Stage 7 · Interactivity, the last two pages, and the static demo
+**Type:** milestone
+**What happened:** The owner asked for Power BI-style interactivity, then "execute until you're done". Built: cross-filtering (click a lead source, rep, segment or corridor; a chip clears it), a deals drill-through, account names that open Account 360, and a data view with CSV download on every chart. Added Account health & risk (7 charts, the owner-approved list) and Account 360 (profile, revenue, volume, health, a dated timeline from lead to risk, deals). Static demo mode: an exporter runs every card for every period and single filter through Metabase with the view-only key; the site reads those files and holds one filter at a time. Playwright covers the four pages and the interactions; Lighthouse accessibility is checked per page; CI gained `web` and `e2e` jobs.
+**Problem -> fix:** (1) The chart kit has no click events: our wrappers remember the hovered datum and treat a click as "filter by it". (2) Smoothed line charts drew dips either side of the corridor spike that were not in the data; lines are now straight. (3) The snapshot export takes ~10 minutes at full scale (4,969 card runs, 4.1 MB), ~4 at the CI scale.
+**Numbers:** all four pages score 100 on Lighthouse accessibility; 8 end-to-end tests with zero console errors; all six planted stories visible.
+**Quotable line:** "A smooth curve is a claim about data you don't have."
+**Generic vs specific (#skill):** generic: card-per-preset snapshots for a database-free demo; click-to-filter on top of a chart kit via the tooltip datum; never smooth sparse time series. Specific: the pages.
+**Tags:** #linkedin #article #case-study #video #skill
+
+## 2026-11-25 · Stage 7 · Gate 7, loop 1: the unit runner ran the browser tests
+**Type:** problem-fix
+**What happened:** The first full `make gate-7` failed in `web-check`: Vitest's default pattern also matched `web/e2e/pages.spec.ts` and Playwright refused to be called from it. Unit tests had passed only because they were last run before the e2e file existed. Fix: Vitest includes `src/**/*.test.ts` only; the browser tests run through Playwright. Whole gate rerun.
+**Tags:** #skill
+
+## 2026-11-25 · Stage 7 · Gate 7, loops 2 and 3 attempts: the bootstrap's 3-minute limit, on a starved laptop
+**Type:** problem-fix
+**What happened:** Two full local `make gate-7` runs failed at the Metabase bootstrap time limit (180 s): 230 s, then 209 s. The same step took 23-51 s earlier the same day. First run: the Mac went into idle sleep during the bootstrap (pmset log: sleep 13:09 UTC, wake 13:38; matching 30-minute gap in the Metabase log); rerun with `caffeinate`. Second run, awake: Metabase startup took 2.9 minutes instead of about 40 s, one dashboard save 12.8 s, with swap at 16.2 of 17.4 GB, load average 15 on 8 cores, and about 14 containers from other projects sharing Docker's 5.8 GB. The limit was not changed. The agent pushed the branch so CI (a clean machine) could check the same gate, and asked the owner before touching other projects' containers.
+**Why it matters:** A timing gate measures the machine too. The honest fix is the environment, not a bigger number.
+**Generic vs specific (#skill):** generic: before blaming code for a timing failure, check sleep logs, swap and neighbouring containers; never raise a gate's limit to pass it. Specific: Metabase on a laptop.
+**Tags:** #skill
+
+## 2026-11-25 · Stage 7 · Green browser tests, useless screenshots
+**Type:** surprise
+**What happened:** CI passed all 10 checks on PR #9 (cb7d7c5); in its logs the Metabase bootstrap took 14.3 s against the 180 s limit, the 8 browser tests passed and Lighthouse accessibility was 100 on all four pages. Looking at the local screenshots meant for the design sign-off, though, bars were half grown and lines drawn only to February: the test captured the charts mid-animation. They also came from a snapshot built on 0.1-scale data, while the evidence notes claimed full scale. Neither was visible to any check, since the tests assert that charts exist and the console is clean. Fix: the screenshot test asks for reduced motion and waits for animations to finish; the snapshot was re-exported at full scale and all six planted stories checked by eye in the new images.
+**Why it matters:** An evidence file nobody opens proves nothing. Look at every image before asking someone to approve it.
+**Generic vs specific (#skill):** generic: wait for animations before visual captures; stamp or check the data scale behind any evidence. Specific: the chart kit's wipe-in animations.
+**Tags:** #skill
+
+## 2026-11-26 · Side branch · The same dashboard without Metabase
+**Type:** decision
+**What happened:** The owner asked whether dbt and Metabase are necessary, then asked for a second version of the dashboard without Metabase on its own port, and approved the design ("go"). Built on branch `local-direct-postgres`: a small server with the same API runs `metabase/cards/*.sql` in Postgres as `bi_reader`; the web app is unchanged (`make dev-direct`, :5174). `scripts/compare_direct.py`: 50 cards, 229 comparisons, 0 differences. Median of 5 unfiltered runs on six queries: 0.20-0.28 s through Metabase, 0.004-0.031 s direct, on the same Mac.
+**Options considered / pushback:** Copy the project (rejected: drift). Use the static snapshot (rejected: still exported through Metabase, one filter at a time). Metabase stays the official path (D1); dropping it is a separate, later decision. Not merged, not part of any gate.
+**Why it matters:** Because every query lived in the repo as SQL, removing the BI layer from the read path was a small change that could be proven identical.
+**Generic vs specific (#skill):** generic: keep card SQL in files with a thin parameter syntax, so the query runner can be swapped and diffed. Specific: Metabase template tags, type names and 2,000-row limit.
+**Tags:** #skill
+
+## 2026-11-27 · Beyond Stage 7 · Owner ideas: D3, Cube, and turning this into a product (parked)
+**Type:** decision
+**What happened:** After comparing a local version without Metabase (branch `local-direct-postgres`, noticeably faster) with the official one, and talking to peers, the owner said Metabase shouldn't stay just for its own sake, and raised three things:
+1. **D3** for custom visuals with full control.
+2. **Cube** in the role Metabase plays now: semantic layer, pre-aggregations and so on.
+3. **A product:** make this process repeatable across businesses, as a development-kit style SaaS. Connect a business's real sources; mirror their structure into a development sandbox filled with synthetic data; design the dashboard there, so no real data is shared with the AI; on deploy, the same dashboard runs on production data.
+
+The owner asked for this to be noted for building that business, and not to sprawl now. No plan, stage or tool changes.
+**Agent's notes (not owner decisions):** The chart kit in use already builds on D3 modules (`d3-scale`, `d3-shape`, `d3-sankey`). Today Metabase does little semantic-layer work here: metric logic lives in dbt marts, card SQL and `metrics/metrics.yml`, and no Metabase pre-aggregation is used. Cube would sit between the marts and the app; it doesn't replace dbt. The product idea has early pieces here (schema contract, compiled CRM map, seeded generator, aggregate-only conformance in Stage 8, deploy from env). Open questions: what can be profiled from real data without leaking it; how close synthetic data must be before surprises only show in production (rule 9); how much per-business mapping can be automated.
+**Why it matters:** Stages 8 (swap rehearsal) and 11 (reusable skill) are the first real test of the product idea.
+**Generic vs specific (#skill):** generic: contract, mapping, synthetic mirror, conformance, deploy. Specific: payments metrics and the HubSpot map.
+**Tags:** #skill
+
+## 2026-11-27 · Beyond Stage 7 · Drop Metabase; targets, deal history and a new layout
+**Type:** decision
+**What happened:** The owner shared screenshots of nine pages of a sales dashboard demo. The audit found repeated metrics across its pages, and in ours two different win percentages per lead source on one page, repeated risk figures, and no overview, target or forecast. The owner approved: sales targets set in the dashboard; deal change history now; five pages (Overview, Pipeline, Team, Revenue & retention, Account health); a Stage 7B with the contract change and new answer-key entries (`docs/proposals/2026-11-27-dashboard-v2.md`). The owner decided to drop Metabase because it is slower and the dashboard should be snappy; the direct Postgres version is the way forward. The Metabase containers and the :5173 preview were stopped.
+**Options considered / pushback:** Keep Metabase, or use both. The cost of dropping it: no self-serve exploration, four dashboards lost, and the proxy, snapshot export, three-way number check, gates and CI need rework. No check has been changed yet. Whether to finish gate 7 first is still open.
+**Why it matters:** The read path is now chosen on measured speed (0.004-0.031 s against 0.20-0.28 s).
+**Generic vs specific (#skill):** generic: audit a reference dashboard for questions answered and repeats, then check each idea against the data before promising it. Specific: payments sales metrics.
+**Tags:** #skill
+
+## 2026-11-27 · Stage 6/7 · Metabase removed from the project
+**Type:** decision
+**What happened:** With the owner's approval of a check-by-check table (docs/gates/log.md), Metabase was taken out. `metabase/` became `queries/`; the bootstrap, native dashboards, models and measures were deleted; the direct Postgres server became the only server and now runs on Node and the Cloudflare Workers runtime. Replaced checks: reader permissions (from the database catalog, plus one real refused write; proven to fail for an over-privileged user), three-way golden against the dashboard server (19/19), every query within 2 s (87 queries, slowest 0.07 s), golden answers on workerd. The full static snapshot export went from about 10 minutes to 23 s including the build.
+**Options considered / pushback:** The first version of the direct server read SQL from disk, which cannot run on Workers; the SQL is now generated into the server bundle, never the browser. While porting tests, the agent first dropped three golden-check tests that lived in the Metabase test file; noticed and restored before running them.
+**Why it matters:** One service and one database fewer, and the checks that matter (numbers, permissions, parameters) survived.
+**Generic vs specific (#skill):** generic: when removing a layer, list every check it carried and say what replaces each before deleting; test that a new permission check can fail. Specific: Metabase v0.64.
+**Tags:** #skill
+
+## 2026-11-27 · Stage 7 · Gate 7 passes locally, without Metabase
+**Type:** gate-pass
+**What happened:** A full `make gate-7` passed on the first run after the change: gates 0-6, 124 Python, 13 server and 57 web tests, golden 19/19 against the dashboard server on Node and on the Workers runtime, slowest of 87 queries 0.20 s, 8/8 browser tests, accessibility 100 on four pages. The four evidence screenshots came out identical to those taken through Metabase. The owner's design sign-off is still to come; CI has not yet run this commit.
+**Why it matters:** Identical images from a different read path are independent proof that the dashboard shows the same thing.
+**Generic vs specific (#skill):** generic: screenshot equality is a cheap check when swapping a layer. Specific: none.
+**Tags:** #skill
+
+## 2026-11-27 · Stage 7 · Owner sign-off for gate 7
+**Type:** decision
+**What happened:** The owner approved the design and the planted stories from the four screenshots, and the change to the required checks on `main` (`metabase` replaced by `dashboard`; `web` and `e2e` added). Deferred to Stage 7B: a note that October's minimum-commit true-up is billed in November.
+**Generic vs specific (#skill):** generic: a renamed CI job blocks merges until branch protection is renamed too. Specific: none.
+**Tags:** #skill
+
 ---
 
 ## Owner notes
@@ -325,4 +471,5 @@ _(Your own words, any time. Rough is fine.)_
 | 3 Generator | 2026-11-24 | 2026-11-24 | 6 | warm-up, story robustness, lint; then UTC everywhere |
 | 4 Transformations | 2026-11-24 | 2026-11-24 | 4 | reserved word, sqlfluff macros, version-pinned tests |
 | 5 Golden numbers | 2026-11-24 | 2026-11-24 | 1 | 17/19 then 19/19 after the owner-approved key change |
-| 6 Metabase | 2026-11-24 | pending CI | 2 | stale API key within one make run; activation clipped by the window |
+| 6 Metabase | 2026-11-24 | 2026-11-24 | 2 | stale API key within one make run; activation clipped by the window |
+| 7 Front end | 2026-11-24 | pending sign-off | 3, then passed | e2e picked up by unit runner; two slow-laptop timeouts; Metabase removed |

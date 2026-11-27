@@ -1,0 +1,7 @@
+# Stage 7: the React front end and the dashboard server share one lockfile with the root tooling.
+packages:
+  - web
+  - proxy
+allowBuilds:
+  esbuild: true
+  workerd: true # Cloudflare's local runtime (make worker-check)

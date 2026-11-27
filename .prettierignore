@@ -13,3 +13,17 @@ contract/data_dictionary.md
 dbt/models/staging/crm/
 generator/answer_keys/
 dbt/models/staging/_stg_contract__models.yml
+
+# Vendored chart kit and samples installed from shadcn.io (owner's account, 2026-11-25).
+# We wrap these behind web/src/charts/, never reformat or hand-edit them; reinstall to update.
+web/src/components/ui/charts/
+web/src/components/charts/
+
+# Generated card registry (scripts/export_card_registry.py)
+web/src/api/cards.generated.ts
+
+# Generated snapshot (scripts/export_snapshot.py)
+web/public/snapshot/
+web/dist-snapshot/
+# Generated server SQL (scripts/export_card_registry.py)
+proxy/src/sql.generated.ts

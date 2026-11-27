@@ -16,6 +16,9 @@ select
     leads.lead_id,
     leads.account_id,
     leads.contact_id,
+    -- The linked account's segment and owner, so lead conversion can follow those filters.
+    accounts.segment,
+    accounts.owner_id,
     coalesce(leads.lead_source, 'unknown') as lead_source,
     leads.created_at,
     {{ utc_date('leads.created_at') }} as created_date,

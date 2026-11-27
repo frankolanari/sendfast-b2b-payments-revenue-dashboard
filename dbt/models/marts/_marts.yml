@@ -47,6 +47,12 @@ models:
       - name: net_revenue_first_12m_usd
         description: Net revenue in the first 12 calendar months from go-live; null unless all 12 are in the window.
 
+  - name: dim_stages
+    description: Opportunity stages in funnel order; lost is terminal and unranked.
+    columns:
+      - name: stage
+        data_tests: [not_null, unique]
+
   - name: fct_leads_funnel
     columns:
       - name: lead_id
@@ -66,6 +72,18 @@ models:
     columns:
       - name: opportunity_id
         data_tests: [not_null, unique]
+      - name: furthest_stage_rank
+        description: Highest funnel rank reached (dim_stages); every deal starts at discovery.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [1, 2, 3, 4, 5], quote: false }
+      - name: outcome
+        description: won, lost, or open as of 2026-10-31.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [won, lost, open] }
       - name: account_id
         data_tests:
           - not_null
@@ -136,6 +154,63 @@ models:
             { combination_of_columns: [cohort_quarter, months_since_live] }
       - expression_is_true:
           arguments: { expression: "logo_retention between 0 and 1" }
+    columns:
+      - name: is_complete
+        description: True when every account in the cohort had reached this month by the as-of date; false cells are right-censored.
+        data_tests: [not_null]
+
+  - name: fct_cohort_account_months
+    description: Account x month since go-live; the grain behind fct_cohort_retention.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments: { combination_of_columns: [account_id, months_since_live] }
+    columns:
+      - name: account_id
+        data_tests: [not_null]
+      - name: months_since_live
+        data_tests: [not_null]
+
+  - name: fct_lead_journeys
+    description: One row per lead, followed through to its deal (lead -> opportunity -> won).
+    data_tests:
+      - expression_is_true:
+          arguments: { expression: "is_converted or opportunity_id is null" }
+    columns:
+      - name: lead_id
+        data_tests: [not_null, unique]
+      - name: opportunity_id
+        data_tests: [unique]
+      - name: stage_reached
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: { values: [0, 1, 2, 3, 4, 5], quote: false }
+
+  - name: fct_account_timeline
+    description: Dated events per account, lead to risk, for Account 360.
+    columns:
+      - name: account_id
+        data_tests: [not_null]
+      - name: event_date
+        data_tests: [not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                {
+                  values:
+                    [
+                      lead,
+                      deal,
+                      won,
+                      lost,
+                      live,
+                      first_payment,
+                      pricing,
+                      risk,
+                      churn,
+                    ],
+                }
 
   - name: fct_account_health_monthly
     data_tests:

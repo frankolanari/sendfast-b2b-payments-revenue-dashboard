@@ -1,15 +1,15 @@
-"""Golden-number check (PLAN.md Stages 5 and 6): answer key vs marts vs Metabase.
+"""Golden-number check (PLAN.md Stages 5 and 6): answer key vs marts vs the dashboard.
 
-Stage 1: every metric in metrics/metrics.yml runs its golden query against the analytics marts,
-as the bi_reader role (what BI sees), and is compared with generator/answer_keys/scale_<s>.json.
-Stage 2 (--metabase): three-way agreement. Through the proxy's view-only API key, each metric's
-generated golden card must match both the key and the marts, and where golden.card names a
-dashboard card, that card (run with the listed filters) must match the key too.
+Stage 5: every metric in metrics/metrics.yml runs its golden query against the analytics marts,
+as the bi_reader role (what the dashboard sees), and is compared with
+generator/answer_keys/scale_<s>.json.
+Stage 6 (--dashboard): three-way agreement. Where golden.card names a dashboard card, the
+dashboard server is asked for it (with the listed filters) and its answer must match the key too.
 A mismatch prints the metric, the source, expected, actual, tolerance and the SQL used.
 
 Output is aggregates only (rule 8): metric values and counts, never rows.
 
-    uv run python scripts/golden_check.py --scale 1.0 [--metabase]
+    uv run python scripts/golden_check.py --scale 1.0 [--dashboard]
 """
 
 from __future__ import annotations
@@ -19,10 +19,13 @@ import json
 import math
 import os
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import card_content
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -208,7 +211,7 @@ def run(spec: dict[str, Any], key: dict[str, Any], conn) -> list[Result]:
     return results
 
 
-# ── Stage 2: Metabase ────────────────────────────────────────────────────
+# ── Stage 6: the dashboard as the third source ───────────────────────────
 def rows_as_entry(columns: list[str], rows: list[tuple], by: str | None) -> dict[str, Any]:
     """Query rows in the answer key's shape, so one source can be compared with another."""
     if by is None:
@@ -217,59 +220,49 @@ def rows_as_entry(columns: list[str], rows: list[tuple], by: str | None) -> dict
     return {c: {r[idx]: r[i] for r in rows} for i, c in enumerate(columns) if c != by}
 
 
-def card_parameters(card_ref: dict[str, Any], periods: dict[str, Any], contract: dict) -> list:
-    out = []
-    for pname, period in (card_ref.get("parameters") or {}).items():
-        kind = "date/single" if contract[pname]["type"] == "date" else "string/="
-        out.append(
-            {
-                "id": pname,
-                "type": kind,
-                "target": ["variable", ["template-tag", pname]],
-                "value": str(periods[period]),
-            }
-        )
-    return out
+def dashboard_url() -> str:
+    port = os.environ.get("PROXY_PORT", "8788")
+    return os.environ.get("DASHBOARD_URL", f"http://localhost:{port}")
 
 
-def run_metabase(spec, key, results: list[Result], mb, golden_prefix: str, contract) -> None:
-    """Add Metabase's answers to each result: the golden card and, if named, the dashboard card."""
-    cards = {c["name"]: c["id"] for c in mb.get("/api/card?f=all") if not c.get("archived")}
+def query_card(base: str, slug: str, parameters: dict[str, str]) -> dict[str, Any]:
+    """Ask the dashboard server for a card, as the browser does."""
+    request = urllib.request.Request(
+        f"{base}/api/cards/{slug}",
+        data=json.dumps({"parameters": parameters}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as err:
+        raise RuntimeError(f"HTTP {err.code}: {err.read().decode()[:200]}") from err
+
+
+def card_parameters(card_ref: dict[str, Any], periods: dict[str, Any]) -> dict[str, str]:
+    return {
+        name: str(periods[period]) for name, period in (card_ref.get("parameters") or {}).items()
+    }
+
+
+def run_dashboard(spec, key, results: list[Result], base: str, slugs: dict[str, str]) -> None:
+    """The third source: what the dashboard server answers for each metric's dashboard card."""
     for m, res in zip(spec["metrics"], results, strict=True):
         golden = m["golden"]
         entry = key["metrics"][m["name"]]
-        gname = golden_prefix + m["name"]
-        if gname not in cards:
-            res.problems.append(f"Metabase: no card {gname!r} (run make metabase-bootstrap)")
-            continue
-        out = mb.post(f"/api/card/{cards[gname]}/query", {"parameters": []})
-        if out.get("status") != "completed":
-            res.problems.append(f"Metabase {gname!r}: {str(out.get('error'))[:200]}")
-            continue
-        columns = [c["name"] for c in out["data"]["cols"]]
-        rows = [tuple(r) for r in out["data"]["rows"]]
-        res.problems += [
-            f"Metabase vs key: {p}" for p in compare(m["name"], entry, columns, rows, golden)
-        ]
-        marts = rows_as_entry(res.columns, res.rows, golden.get("by"))
-        if marts:
-            vs_marts = compare(m["name"], marts, columns, rows, golden)
-            res.problems += [f"Metabase vs marts: {p}" for p in vs_marts]
-        res.checks.append("golden card")
-
         ref = golden.get("card")
         if not ref:
             continue
-        if ref["name"] not in cards:
-            res.problems.append(f"Metabase: no dashboard card {ref['name']!r}")
+        if ref["name"] not in slugs:
+            res.problems.append(f"dashboard: no card {ref['name']!r}")
             continue
-        params = card_parameters(ref, spec["periods"], contract)
-        out = mb.post(f"/api/card/{cards[ref['name']]}/query", {"parameters": params})
-        if out.get("status") != "completed":
-            res.problems.append(f"Metabase {ref['name']!r}: {str(out.get('error'))[:200]}")
+        try:
+            out = query_card(base, slugs[ref["name"]], card_parameters(ref, spec["periods"]))
+        except RuntimeError as err:
+            res.problems.append(f"dashboard card {ref['name']!r}: {err}")
             continue
-        names = [c["name"] for c in out["data"]["cols"]]
-        rows = out["data"]["rows"]
+        names = [c["name"] for c in out["columns"]]
+        rows = out["rows"]
         if len(rows) != 1 or ref["column"] not in names:
             res.problems.append(
                 f"dashboard card {ref['name']!r}: expected one row with {ref['column']!r}"
@@ -306,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scale", type=float, default=1.0, help="which answer key (1.0 or 0.1)")
     ap.add_argument("--metrics", type=Path, default=METRICS_PATH)
     ap.add_argument(
-        "--metabase", action="store_true", help="three-way: also check Metabase (Stage 6)"
+        "--dashboard", action="store_true", help="three-way: also check the dashboard server"
     )
     args = ap.parse_args(argv)
 
@@ -327,18 +320,9 @@ def main(argv: list[str] | None = None) -> int:
         results = run(spec, key, conn)
     finally:
         conn.close()
-    if args.metabase:
-        import metabase_content as mc
-        from metabase_bootstrap import Client, read_key_file
-
-        # The file the bootstrap just wrote beats the env: make reads .env.metabase once, at
-        # start, so within `make gate-6` the env still holds the key from before the reset.
-        api_key = read_key_file() or os.environ.get("MB_API_KEY")
-        if not api_key:
-            print("MB_API_KEY is not set: run make metabase-bootstrap (writes .env.metabase)")
-            return 1
-        mb = Client(os.environ["MB_SITE_URL"], api_key=api_key)  # the proxy's view-only key
-        run_metabase(spec, key, results, mb, mc.GOLDEN_PREFIX, mc.load_parameters())
+    if args.dashboard:
+        slugs = {c.name: Path(c.source).stem for c in card_content.load_cards()}
+        run_dashboard(spec, key, results, dashboard_url(), slugs)
     print(report(results))
     return 0 if all(r.ok for r in results) else 1
 
