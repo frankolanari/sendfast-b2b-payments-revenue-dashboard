@@ -425,6 +425,12 @@ The owner asked for this to be noted for building that business, and not to spra
 **Generic vs specific (#skill):** generic: screenshot equality is a cheap check when swapping a layer. Specific: none.
 **Tags:** #skill
 
+## 2026-11-27 · Stage 7 · Owner sign-off for gate 7
+**Type:** decision
+**What happened:** The owner approved the design and the planted stories from the four screenshots, and the change to the required checks on `main` (`metabase` replaced by `dashboard`; `web` and `e2e` added). Deferred to Stage 7B: a note that October's minimum-commit true-up is billed in November.
+**Generic vs specific (#skill):** generic: a renamed CI job blocks merges until branch protection is renamed too. Specific: none.
+**Tags:** #skill
+
 ---
 
 ## Owner notes

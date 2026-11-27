@@ -55,3 +55,10 @@ The owner approved, from a table shown in the session:
   dashboard, layout, cross-filter, drill-link and measure tests. The G6 owner sign-off on
   Metabase cross-filtering is covered by the Stage 7 design sign-off.
 - Before gate 7 passes, the server must run on Cloudflare Workers as well as Node.
+
+## 2026-11-27 · Gate 7: owner sign-off and merge rules
+
+- The owner approved the design and planted stories (docs/evidence/gate-7/). The note that
+  October's true-up is not yet billed moves to Stage 7B.
+- The owner approved the required checks on `main`: `metabase` replaced by `dashboard`, and `web`
+  and `e2e` added.
